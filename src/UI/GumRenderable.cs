@@ -92,4 +92,6 @@ public class GumRenderable : IRenderable, IAttachable
         }
         GumRenderBatch.Instance.DrawElement(Visual);
     }
+
+    public override string ToString() => Visual?.ToString() ?? "No Gum Object";
 }

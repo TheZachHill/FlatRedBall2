@@ -72,9 +72,54 @@
     <Variable Type="DimensionUnitType" Name="HeightUnits" SetsValue="true">
       <Value xsi:type="xsd:int">4</Value>
     </Variable>
+    <Variable Type="int" Name="HoverBorder.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">82</Value>
+    </Variable>
+    <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+      <Value xsi:type="xsd:string">Primary</Value>
+    </Variable>
+    <Variable Type="float" Name="HoverBorder.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">4</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="HoverBorder.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="StyleCategory" Name="HoverBorder.StyleCategoryState" SetsValue="true">
+      <Value xsi:type="xsd:string">Bordered</Value>
+    </Variable>
+    <Variable Type="float" Name="HoverBorder.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">4</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="HoverBorder.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="HoverBorder.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="HoverBorder.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="HoverBorder.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="HoverBorder.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="HoverBorder.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="HoverBorder.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
     <Variable Type="State" Name="State" Category="States and Visibility" SetsValue="true" />
+    <Variable Type="int" Name="TextInstance.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">65</Value>
+    </Variable>
     <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
       <Value xsi:type="xsd:string">White</Value>
+    </Variable>
+    <Variable Type="int" Name="TextInstance.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">109</Value>
     </Variable>
     <Variable Type="float" Name="TextInstance.Height" SetsValue="true">
       <Value xsi:type="xsd:float">5</Value>
@@ -84,6 +129,9 @@
     </Variable>
     <Variable Type="HorizontalAlignment" Name="TextInstance.HorizontalAlignment" SetsValue="true">
       <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="TextInstance.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
     </Variable>
     <Variable Type="StyleCategory" Name="TextInstance.StyleCategoryState" SetsValue="true">
       <Value xsi:type="xsd:string">Strong</Value>
@@ -115,6 +163,13 @@
     <Variable Type="float" Name="Width" SetsValue="true">
       <Value xsi:type="xsd:float">128</Value>
     </Variable>
+    <VariableList xsi:type="VariableListSaveOfString">
+      <Type>string</Type>
+      <Name>TextInstance.VariableReferences</Name>
+      <IsFile>false</IsFile>
+      <IsHiddenInPropertyGrid>false</IsHiddenInPropertyGrid>
+      <Value />
+    </VariableList>
   </State>
   <Category>
     <Name>ButtonCategory</Name>
@@ -126,8 +181,26 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">White</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
@@ -138,8 +211,26 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">Gray</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
@@ -150,20 +241,56 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">White</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
       <Name>Pushed</Name>
+      <Variable Type="int" Name="Background.Blue" SetsValue="true">
+        <Value xsi:type="xsd:int">210</Value>
+      </Variable>
       <Variable Type="ColorCategory" Name="Background.ColorCategoryState" SetsValue="true">
         <Value xsi:type="xsd:string">PrimaryDark</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" SetsValue="true">
+        <Value xsi:type="xsd:int">210</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">210</Value>
       </Variable>
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">White</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">230</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
@@ -174,8 +301,26 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">true</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">White</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
@@ -186,8 +331,26 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">true</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">White</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
     <State>
@@ -198,12 +361,31 @@
       <Variable Type="bool" Name="FocusedIndicator.Visible" SetsValue="true">
         <Value xsi:type="xsd:boolean">true</Value>
       </Variable>
-      <Variable Type="ColorCategory" Name="TextInstance.ColorCategoryState" SetsValue="true">
-        <Value xsi:type="xsd:string">Gray</Value>
+      <Variable Type="ColorCategory" Name="HoverBorder.ColorCategoryState" SetsValue="true">
+        <Value xsi:type="xsd:string">Primary</Value>
+      </Variable>
+      <Variable Type="bool" Name="HoverBorder.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="int" Name="HoverBorder.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Green" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Red" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="int" Name="Background.Blue" Category="Rendering" SetsValue="true">
+        <Value xsi:type="xsd:int">255</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.HasEvents" Category="Behavior" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
       </Variable>
     </State>
   </Category>
-  <Instance Name="Background" BaseType="NineSlice" />
+  <Instance Name="HoverBorder" BaseType="RoundedRectangle" />
+  <Instance Name="Background" BaseType="RoundedRectangle" />
   <Instance Name="TextInstance" BaseType="Text" />
   <Instance Name="FocusedIndicator" BaseType="NineSlice" />
   <Behaviors>

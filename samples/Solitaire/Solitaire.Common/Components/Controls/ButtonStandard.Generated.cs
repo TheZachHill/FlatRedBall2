@@ -68,7 +68,8 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
             }
         }
     }
-    public NineSliceRuntime Background { get; protected set; }
+    public RoundedRectangleRuntime HoverBorder { get; protected set; }
+    public RoundedRectangleRuntime Background { get; protected set; }
     public TextRuntime TextInstance { get; protected set; }
     public NineSliceRuntime FocusedIndicator { get; protected set; }
 
@@ -85,7 +86,8 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
     protected override void ReactToVisualChanged()
     {
         base.ReactToVisualChanged();
-        Background = this.Visual?.GetGraphicalUiElementByName("Background") as global::MonoGameGum.GueDeriving.NineSliceRuntime;
+        HoverBorder = this.Visual?.GetGraphicalUiElementByName("HoverBorder") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
+        Background = this.Visual?.GetGraphicalUiElementByName("Background") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
         TextInstance = this.Visual?.GetGraphicalUiElementByName("TextInstance") as global::MonoGameGum.GueDeriving.TextRuntime;
         FocusedIndicator = this.Visual?.GetGraphicalUiElementByName("FocusedIndicator") as global::MonoGameGum.GueDeriving.NineSliceRuntime;
         CustomInitialize();

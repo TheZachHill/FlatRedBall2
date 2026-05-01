@@ -7,8 +7,8 @@
   <UseFontCharacterFile>false</UseFontCharacterFile>
   <AutoSizeFontOutputs>false</AutoSizeFontOutputs>
   <Version>2</Version>
-  <DefaultCanvasWidth>1280</DefaultCanvasWidth>
-  <DefaultCanvasHeight>720</DefaultCanvasHeight>
+  <DefaultCanvasWidth>800</DefaultCanvasWidth>
+  <DefaultCanvasHeight>640</DefaultCanvasHeight>
   <CustomCanvasSizes>
     <CustomCanvasSize>
       <Width xsi:nil="true" />
@@ -99,6 +99,7 @@
   <ComponentReference Name="Elements/VerticalLines" />
   <ComponentReference Name="FoundationSlot" />
   <ComponentReference Name="Styles" />
+  <ComponentReference Name="WinOverlayGum" />
   <StandardElementReference Name="Arc" />
   <StandardElementReference Name="Canvas" />
   <StandardElementReference Name="Circle" />

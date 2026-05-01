@@ -2,12 +2,9 @@
   "TreeViewState": {
     "ExpandedNodes": [
       "Screens",
-      "Screens/GameScreenGum",
-      "Screens/GameScreenGum/FoundationContainer",
-      "Screens/GameScreenGum/TableauContainer",
-      "Screens/TestScreen",
       "Components",
-      "Components/FoundationSlot",
+      "Components/Controls",
+      "Components/WinOverlayGum",
       "Standard"
     ]
   }

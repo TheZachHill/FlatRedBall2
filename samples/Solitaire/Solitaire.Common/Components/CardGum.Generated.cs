@@ -136,10 +136,13 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
         }
     }
     public RoundedRectangleRuntime Background { get; protected set; }
+    public RoundedRectangleRuntime Border { get; protected set; }
     public TextRuntime RankText1 { get; protected set; }
     public TextRuntime RankText2 { get; protected set; }
     public SpriteRuntime SuitIcon { get; protected set; }
     public RoundedRectangleRuntime Back { get; protected set; }
+    public RoundedRectangleRuntime BackOuterBorder { get; protected set; }
+    public RoundedRectangleRuntime BackInnerBorder { get; protected set; }
 
     public CardGum(InteractiveGue visual) : base(visual)
     {
@@ -154,10 +157,13 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
     {
         base.ReactToVisualChanged();
         Background = this.Visual?.GetGraphicalUiElementByName("Background") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
+        Border = this.Visual?.GetGraphicalUiElementByName("Border") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
         RankText1 = this.Visual?.GetGraphicalUiElementByName("RankText1") as global::MonoGameGum.GueDeriving.TextRuntime;
         RankText2 = this.Visual?.GetGraphicalUiElementByName("RankText2") as global::MonoGameGum.GueDeriving.TextRuntime;
         SuitIcon = this.Visual?.GetGraphicalUiElementByName("SuitIcon") as global::MonoGameGum.GueDeriving.SpriteRuntime;
         Back = this.Visual?.GetGraphicalUiElementByName("Back") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
+        BackOuterBorder = this.Visual?.GetGraphicalUiElementByName("BackOuterBorder") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
+        BackInnerBorder = this.Visual?.GetGraphicalUiElementByName("BackInnerBorder") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
         CustomInitialize();
     }
     //Not assigning variables because Object Instantiation Type is set to By Name rather than Fully In Code

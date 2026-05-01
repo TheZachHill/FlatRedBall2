@@ -1,5 +1,6 @@
 using FlatRedBall2;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Solitaire.Screens;
 
@@ -12,15 +13,22 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
+        // Apos.Shapes needs SM 4.0+. MonoGame tops out at HiDef; KNI needs FL10_0 for equivalent.
+#if KNI
+        _graphics.GraphicsProfile = GraphicsProfile.FL10_0;
+#else
+        _graphics.GraphicsProfile = GraphicsProfile.HiDef;
+#endif
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
 
         var ds = FlatRedBallService.Default.DisplaySettings;
-        ds.ResolutionWidth = 1280;
-        ds.ResolutionHeight = 720;
-        ds.PreferredWindowWidth = 1280;
-        ds.PreferredWindowHeight = 720;
-        ds.AllowUserResizing = true;
+        const int height = 640;
+        ds.ResolutionWidth = 800;
+        ds.ResolutionHeight = height;
+        ds.PreferredWindowWidth = 800;
+        ds.PreferredWindowHeight = height;
+        ds.AllowUserResizing = false ;
 
         FlatRedBallService.Default.PrepareWindow<GameScreen>(_graphics);
     }

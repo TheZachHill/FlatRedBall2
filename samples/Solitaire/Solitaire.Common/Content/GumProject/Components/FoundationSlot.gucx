@@ -112,10 +112,38 @@
     <Variable Type="State" Name="State" Category="States and Visibility" SetsValue="false">
       <Value xsi:type="xsd:string">Default</Value>
     </Variable>
+    <Variable Type="Suit" Name="SuitState" SetsValue="true" />
     <Variable Type="float" Name="Width" SetsValue="true">
       <Value xsi:type="xsd:float">80</Value>
     </Variable>
   </State>
+  <Category>
+    <Name>Suit</Name>
+    <State>
+      <Name>Spades</Name>
+      <Variable IsFile="true" Type="string" Name="SpriteInstance.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">spade.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Hearts</Name>
+      <Variable IsFile="true" Type="string" Name="SpriteInstance.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">heart.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Clubs</Name>
+      <Variable IsFile="true" Type="string" Name="SpriteInstance.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">club.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Diamonds</Name>
+      <Variable IsFile="true" Type="string" Name="SpriteInstance.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">diamond.png</Value>
+      </Variable>
+    </State>
+  </Category>
   <Instance Name="Background" BaseType="RoundedRectangle" />
   <Instance Name="Background1" BaseType="RoundedRectangle" />
   <Instance Name="SpriteInstance" BaseType="Sprite" />

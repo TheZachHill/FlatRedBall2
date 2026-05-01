@@ -32,6 +32,38 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
             return gue;
         });
     }
+    public enum Suit
+    {
+        Spades,
+        Hearts,
+        Clubs,
+        Diamonds,
+    }
+
+    Suit? _suitState;
+    public Suit? SuitState
+    {
+        get => _suitState;
+        set
+        {
+            _suitState = value;
+            if(value != null)
+            {
+                if(Visual.Categories.ContainsKey("Suit"))
+                {
+                    var category = Visual.Categories["Suit"];
+                    var state = category.States.Find(item => item.Name == value.ToString());
+                    this.Visual.ApplyState(state);
+                }
+                else
+                {
+                    var category = ((global::Gum.DataTypes.ElementSave)this.Visual.Tag).Categories.FirstOrDefault(item => item.Name == "Suit");
+                    var state = category.States.Find(item => item.Name == value.ToString());
+                    this.Visual.ApplyState(state);
+                }
+            }
+        }
+    }
     public RoundedRectangleRuntime Background { get; protected set; }
     public RoundedRectangleRuntime Background1 { get; protected set; }
     public SpriteRuntime SpriteInstance { get; protected set; }
