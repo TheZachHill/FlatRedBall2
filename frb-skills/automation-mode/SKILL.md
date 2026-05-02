@@ -40,7 +40,7 @@ FlatRedBallService.Default.EnableAutomationMode(seed: 1234);
 
 The seed is only applied when `--frb-auto` activates automation; without the flag, ship-time seed values have no effect on a normal run.
 
-Game code that constructs its own `Random`/`GameRandom` is **not** seeded by the engine — for now, route gameplay randomness through `FlatRedBallService.Random` if you want it covered.
+Game code that constructs its own `Random`/`GameRandom` is **not** seeded by the engine — route gameplay randomness through `FlatRedBallService.Random` (or derive your own seed from it) if you want it included in the deterministic run.
 
 ## Command Protocol
 

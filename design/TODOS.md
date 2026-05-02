@@ -17,10 +17,6 @@ Possible directions:
 - Or reach into Gum's Forms input system to register entity-attached `FrameworkElement`s as input-eligible without re-parenting.
 - Either way: fixing this also fixes per-element hot-reload for entity visuals (no screen restart needed), so it's worth doing properly rather than papering over each symptom.
 
-## Deterministic seeds for game-owned Randoms under automation mode
-
-`FlatRedBallService.Random` is now seeded deterministically when automation activates (via `EnableAutomationMode(seed)`). What's still open: game code that constructs its own `Random` / `GameRandom` doesn't go through the engine's instance, so `new Random()` calls leak non-determinism into recorded runs. Need an API for game code to ask the engine for a seed (e.g. `FlatRedBallService.NextSeed()` derived from the engine's seeded sequence) so all gameplay randomness collapses onto one reproducible chain. Decide whether this should also retroactively cover libraries the engine consumes that allocate their own RNG internally, or whether that's strictly the game's problem.
-
 ## Web load times for large Gum projects
 
 Initial load is slow on the BlazorGL/KNI target when a `.gumx` references many components — fonts, control templates, generated runtime types all compile/initialize on the main thread before the first frame draws. Need to (a) measure where the time actually goes (Gum project load vs. runtime registration via `RegisterRuntimeType` module initializers vs. asset decode), (b) decide whether the fix is engine-side (lazy/deferred runtime registration, parallel asset decode) or Gum-side (incremental project load), and (c) confirm WASM-specific costs separate from the same load on desktop. Solitaire's `.gumx` is the readily-available large project to profile against.
