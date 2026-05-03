@@ -228,6 +228,37 @@ public class FlatRedBallService
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
 
+#if KNI
+        // KNI/Blazor has no real filesystem — content lives behind TitleContainer (HTTP on
+        // BlazorGL, AssetManager on Android, NSBundle on iOS). Gum's FileManager only auto-
+        // routes to TitleContainer on Android/iOS; on every other KNI target we install the
+        // hook explicitly so Gum reads (loose .gumx, .gumpkg, textures, fonts, CSV/RESX)
+        // resolve against deployed content. Compose with any pre-existing host hook so we
+        // don't clobber a game that has set up its own asset bundling.
+        if (ToolsUtilities.FileManager.CustomGetStreamFromFile == null)
+        {
+            // TitleContainer.OpenStream rejects paths with a leading '/' or '\' as rooted, but
+            // Gum's FileManager.MakeAbsolute can produce strings like "/Content/GumProject/..."
+            // when normalizing relative input against RelativeDirectory. Strip the leading
+            // separator so the host doesn't see a "rooted" path it refuses to open.
+            ToolsUtilities.FileManager.CustomGetStreamFromFile = path =>
+            {
+                // Strip ALL leading separators — Gum's path normalization on WASM can
+                // produce "/Content/..." or even "//Content/..." in some code paths.
+                int trim = 0;
+                while (trim < path.Length && (path[trim] == '/' || path[trim] == '\\'))
+                {
+                    trim++;
+                }
+                if (trim > 0)
+                {
+                    path = path.Substring(trim);
+                }
+                return Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
+            };
+        }
+#endif
+
         if (settings?.GumProjectFile is string gumProjectFile)
         {
             _gum.Initialize(game, gumProjectFile);
