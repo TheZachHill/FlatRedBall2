@@ -4,19 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## Gum hot-reload clobbers runtime-set properties
-
-Gum's hot-reload patcher reassigns every property on each live instance from the file's defaults whenever a `.gucx`/`.gusx`/`.gumx` changes — including properties the consumer mutated at runtime. Concrete failures observed in Solitaire when `GumHotReloadCompleted` is *not* used to restart the screen:
-
-- Entity-attached card visuals (now reachable through `Screen.EntityVisualsRoot`) get layout passes that move inner instances back to gucx-default positions, even though the outer card position is re-driven each frame by `GumRenderable`.
-- The win overlay's runtime `IsVisible = false` resets to the gucx default (visible).
-
-Both of these are the same underlying issue: the patcher has no model of "this property was set by user code; don't touch it."
-
-Fix lives in **Gum**, not FRB2. Recommended direction: per-property dirty tracking on Gum runtime instances. When game code writes to a property, set a "user-overridden" bit; when hot-reload patches an instance, skip dirty properties. Generalizes correctly: hot-reload still updates anything the game hasn't touched (logo X moves on edit), but never overwrites runtime-controlled state. A `Visible`/`X`/`Y` whitelist is *not* enough — game code can also choose to leave those file-driven (e.g. authored screen logo position), and a whitelist would surprise that consumer.
-
-Until then, the Solitaire sample's hot-reload of card visuals is intentionally broken (positions and overlay visibility reset on Gum edits). No FRB2-side workaround retained — when Gum lands the fix, the sample heals itself with no code change here.
-
 ## Font rendering quality on web at non-native resolutions
 
 Gum renders text from pre-baked bitmap font (`.fnt`) atlases sized for a fixed design resolution. On the BlazorGL/KNI WASM target the browser viewport changes constantly — user resizes, devicePixelRatio differences, mobile rotations — so the atlas gets sampled at fractional scales and text turns blurry / aliased. Solitaire is the obvious repro: at most browser sizes the card-rank/suit labels and any HUD text look noticeably worse than on desktop.
