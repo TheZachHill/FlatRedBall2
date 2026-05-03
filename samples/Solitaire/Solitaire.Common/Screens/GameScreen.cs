@@ -103,6 +103,19 @@ public class GameScreen : Screen
         // edits patch the live Texture2D in-place via Engine.Content.TryReload and skip
         // the restart automatically.
         WatchContentDirectory("Content", _ => RestartScreen(RestartMode.HotReload));
+
+        // Gum project edits (.gucx/.gusx/.gumx) flow through Gum's own hot-reload
+        // pipeline, which DOES reach entity-attached card visuals via Screen.EntityVisualsRoot —
+        // the visuals get patched in place. The remaining problem: Gum's patcher reassigns
+        // every property on each live instance from the file's defaults, including properties
+        // the game has mutated at runtime. That clobbers card positions (inner instance
+        // layout) and the win overlay's runtime IsVisible = false. Restart-on-reload sidesteps
+        // it by rebuilding from a clean slate.
+        //
+        // The proper fix is per-property dirty tracking in Gum's runtime — when game code
+        // writes to a property, mark it user-set; the patcher skips dirty properties. That's
+        // a meaningful chunk of Gum work, deferred for now.
+        Engine.GumHotReloadCompleted += HandleGumHotReloadCompleted;
     }
 
     private void BuildWinOverlay()
@@ -136,6 +149,16 @@ public class GameScreen : Screen
         SpawnAllCardEntities();
         RebuildVisuals();
         _winOverlay.IsVisible = false;
+    }
+
+    public override void CustomDestroy()
+    {
+        Engine.GumHotReloadCompleted -= HandleGumHotReloadCompleted;
+    }
+
+    private void HandleGumHotReloadCompleted()
+    {
+        RestartScreen(RestartMode.HotReload);
     }
 
     public override void CustomActivity(FrameTime time)
