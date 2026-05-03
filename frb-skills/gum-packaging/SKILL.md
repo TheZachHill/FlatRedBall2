@@ -58,7 +58,15 @@ The loader looks for a sibling `.gumpkg` (same directory, same basename) and use
 
 ## .NET version requirement
 
-The bundle loader uses `System.Formats.Tar`, which requires **.NET 7+**. On older targets the `.gumpkg` is ignored and the loader falls back to loose-file resolution.
+The bundle loader requires **.NET 7+**. On older targets the `.gumpkg` is ignored and the loader falls back to loose-file resolution.
+
+## Blazor / KNI WASM target
+
+Loading on Blazor WebAssembly works out of the box with FRB2 — `FlatRedBallService.Initialize` installs a `TitleContainer.OpenStream` hook on Gum's `FileManager` so all bundle and asset reads route through the static-web-asset manifest. No game-side code change is needed.
+
+There's nothing to do per project, but be aware of two constraints if you ever pull bundles in outside FRB2:
+- The decompression must be pure-managed (Gum uses `BrotliSharpLib` + `SharpCompress`). The BCL `System.IO.Compression.BrotliStream` and `System.Formats.Tar` both throw `PlatformNotSupportedException` on browser-WASM.
+- TitleContainer rejects rooted paths (`/Content/...`). FRB2's hook strips leading separators automatically; a custom hook must do the same.
 
 ## FRB2 csproj integration pattern
 

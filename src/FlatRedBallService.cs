@@ -243,9 +243,16 @@ public class FlatRedBallService
             // separator so the host doesn't see a "rooted" path it refuses to open.
             ToolsUtilities.FileManager.CustomGetStreamFromFile = path =>
             {
-                if (!string.IsNullOrEmpty(path) && (path[0] == '/' || path[0] == '\\'))
+                // Strip ALL leading separators — Gum's path normalization on WASM can
+                // produce "/Content/..." or even "//Content/..." in some code paths.
+                int trim = 0;
+                while (trim < path.Length && (path[trim] == '/' || path[trim] == '\\'))
                 {
-                    path = path.Substring(1);
+                    trim++;
+                }
+                if (trim > 0)
+                {
+                    path = path.Substring(trim);
                 }
                 return Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
             };
