@@ -23,24 +23,23 @@ public static class PixelFrameEditor
     /// <summary>
     /// Moves the frame horizontally to the given pixel X position, preserving
     /// the current width.  Both Left and Right are shifted by the same delta.
-    /// The frame is clamped so that it remains fully within [0, textureWidth].
+    /// The frame may extend beyond the texture boundaries (UV coordinates outside [0, 1]).
     /// </summary>
     public static void SetX(AnimationFrameSave frame, int newXPixels, int textureWidth)
     {
         if (frame        == null) throw new ArgumentNullException(nameof(frame));
         if (textureWidth <= 0)    throw new ArgumentOutOfRangeException(nameof(textureWidth), "Must be > 0");
 
-        int frameWidth  = Math.Max(1, RoundToPixel(frame.RightCoordinate, textureWidth)
-                                    - RoundToPixel(frame.LeftCoordinate,  textureWidth));
-        int clampedLeft = Math.Clamp(newXPixels, 0, textureWidth - frameWidth);
-        frame.LeftCoordinate  = clampedLeft              / (float)textureWidth;
-        frame.RightCoordinate = (clampedLeft + frameWidth) / (float)textureWidth;
+        int frameWidth = Math.Max(1, RoundToPixel(frame.RightCoordinate, textureWidth)
+                                   - RoundToPixel(frame.LeftCoordinate,  textureWidth));
+        frame.LeftCoordinate  = newXPixels              / (float)textureWidth;
+        frame.RightCoordinate = (newXPixels + frameWidth) / (float)textureWidth;
     }
 
     /// <summary>
     /// Moves the frame vertically to the given pixel Y position, preserving
     /// the current height.  Both Top and Bottom are shifted by the same delta.
-    /// The frame is clamped so that it remains fully within [0, textureHeight].
+    /// The frame may extend beyond the texture boundaries (UV coordinates outside [0, 1]).
     /// </summary>
     public static void SetY(AnimationFrameSave frame, int newYPixels, int textureHeight)
     {
@@ -49,38 +48,37 @@ public static class PixelFrameEditor
 
         int frameHeight = Math.Max(1, RoundToPixel(frame.BottomCoordinate, textureHeight)
                                     - RoundToPixel(frame.TopCoordinate,    textureHeight));
-        int clampedTop  = Math.Clamp(newYPixels, 0, textureHeight - frameHeight);
-        frame.TopCoordinate    = clampedTop               / (float)textureHeight;
-        frame.BottomCoordinate = (clampedTop + frameHeight) / (float)textureHeight;
+        frame.TopCoordinate    = newYPixels               / (float)textureHeight;
+        frame.BottomCoordinate = (newYPixels + frameHeight) / (float)textureHeight;
     }
 
     /// <summary>
     /// Sets the frame's width in pixels.  LeftCoordinate is unchanged;
-    /// RightCoordinate = LeftCoordinate + clamp(newWidth, 1, textureWidth-leftPx) / textureWidth.
+    /// RightCoordinate = LeftCoordinate + max(1, newWidth) / textureWidth.
+    /// Width is clamped to a minimum of 1 pixel; no upper bound is applied
+    /// (the frame may extend past the right texture edge).
     /// </summary>
     public static void SetWidth(AnimationFrameSave frame, int newWidthPixels, int textureWidth)
     {
         if (frame        == null) throw new ArgumentNullException(nameof(frame));
         if (textureWidth <= 0)    throw new ArgumentOutOfRangeException(nameof(textureWidth), "Must be > 0");
 
-        int leftPixel  = RoundToPixel(frame.LeftCoordinate, textureWidth);
-        int maxWidth   = Math.Max(1, textureWidth - leftPixel);
-        int clampedW   = Math.Clamp(newWidthPixels, 1, maxWidth);
+        int clampedW = Math.Max(1, newWidthPixels);
         frame.RightCoordinate = frame.LeftCoordinate + clampedW / (float)textureWidth;
     }
 
     /// <summary>
     /// Sets the frame's height in pixels.  TopCoordinate is unchanged;
-    /// BottomCoordinate = TopCoordinate + clamp(newHeight, 1, textureHeight-topPx) / textureHeight.
+    /// BottomCoordinate = TopCoordinate + max(1, newHeight) / textureHeight.
+    /// Height is clamped to a minimum of 1 pixel; no upper bound is applied
+    /// (the frame may extend past the bottom texture edge).
     /// </summary>
     public static void SetHeight(AnimationFrameSave frame, int newHeightPixels, int textureHeight)
     {
         if (frame         == null) throw new ArgumentNullException(nameof(frame));
         if (textureHeight <= 0)    throw new ArgumentOutOfRangeException(nameof(textureHeight), "Must be > 0");
 
-        int topPixel   = RoundToPixel(frame.TopCoordinate, textureHeight);
-        int maxHeight  = Math.Max(1, textureHeight - topPixel);
-        int clampedH   = Math.Clamp(newHeightPixels, 1, maxHeight);
+        int clampedH = Math.Max(1, newHeightPixels);
         frame.BottomCoordinate = frame.TopCoordinate + clampedH / (float)textureHeight;
     }
 

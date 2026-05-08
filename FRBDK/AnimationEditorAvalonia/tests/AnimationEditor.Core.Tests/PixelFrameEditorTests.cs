@@ -185,59 +185,81 @@ public class PixelFrameEditorTests
             PixelFrameEditor.SetHeight(frame, 32, 0));
     }
 
-    // ── SetX boundary clamping ────────────────────────────────────────────────
+    // ── SetX boundary behaviour (frames may extend past texture edges) ───────
 
     [Fact]
-    public void SetX_PastRightBoundary_ClampsToWall_PreservesWidth()
+    public void SetX_FullWidthFrame_CanExtendRightPastTexture()
     {
-        // 32px-wide frame (left=0, right=32/256); setX=250 → would push right to 282/256 (> 1.0)
-        // Expected: slide to wall → left=224/256, right=1.0
+        // 1536px-wide frame on a 1536px texture (full width).  Setting X=100 must
+        // shift the frame right; right edge legitimately extends to 1636 (> texture width).
+        var frame = MakeFrame(0f, 1f, 0f, 1f);   // LeftCoord=0, RightCoord=1.0
+
+        PixelFrameEditor.SetX(frame, 100, 1536);
+
+        Assert.Equal(100f / 1536f,  frame.LeftCoordinate,  precision: 4);
+        Assert.Equal(1636f / 1536f, frame.RightCoordinate, precision: 4);
+    }
+
+    [Fact]
+    public void SetX_PastRightBoundary_AllowsExtension_PreservesWidth()
+    {
+        // 32px-wide frame on 256px texture; setX=250 → right lands at 282/256 (> 1.0).
+        // Frames are allowed to extend past the texture edge.
         var frame = MakeFrame(0f, 32f / 256f, 0f, 1f);
+
         PixelFrameEditor.SetX(frame, 250, 256);
-        Assert.Equal(224f / 256f, frame.LeftCoordinate,  precision: 4);
-        Assert.Equal(1f,          frame.RightCoordinate, precision: 4);
+
+        Assert.Equal(250f / 256f, frame.LeftCoordinate,  precision: 4);
+        Assert.Equal(282f / 256f, frame.RightCoordinate, precision: 4);
     }
 
     [Fact]
-    public void SetX_Negative_ClampsToLeftWall()
+    public void SetX_Negative_AllowsNegativeLeft()
     {
-        // 32px-wide frame starting at x=128; setX=-10 → would push left negative
-        // Expected: slide to wall → left=0, right=32/256
+        // 32px-wide frame; setX=-10 → left lands at -10/256 (< 0).
+        // Frames are allowed to extend past the left texture edge.
         var frame = MakeFrame(128f / 256f, 160f / 256f, 0f, 1f);
+
         PixelFrameEditor.SetX(frame, -10, 256);
-        Assert.Equal(0f,         frame.LeftCoordinate,  precision: 4);
-        Assert.Equal(32f / 256f, frame.RightCoordinate, precision: 4);
+
+        Assert.Equal(-10f / 256f, frame.LeftCoordinate,  precision: 4);
+        Assert.Equal(22f / 256f,  frame.RightCoordinate, precision: 4);
     }
 
     [Fact]
-    public void SetX_RightCoordinate_NeverExceedsOne()
+    public void SetX_PastRightBoundary_RightExceedsOne()
     {
+        // Confirms RightCoordinate is NOT clamped to 1.0 when X pushes frame past texture.
         var frame = MakeFrame(0f, 32f / 256f, 0f, 1f);
         PixelFrameEditor.SetX(frame, 300, 256);
-        Assert.True(frame.RightCoordinate <= 1f,
-            $"RightCoordinate={frame.RightCoordinate} must not exceed 1.0");
+        Assert.True(frame.RightCoordinate > 1f,
+            $"RightCoordinate={frame.RightCoordinate} should exceed 1.0 for frame at x=300");
     }
 
-    // ── SetY boundary clamping ────────────────────────────────────────────────
+    // ── SetY boundary behaviour (frames may extend past texture edges) ───────
 
     [Fact]
-    public void SetY_PastBottomBoundary_ClampsToWall()
+    public void SetY_PastBottomBoundary_AllowsExtension()
     {
-        // 32px-tall frame on 128px texture; setY=110 → would push bottom past 1.0
+        // 32px-tall frame on 128px texture; setY=110 → bottom lands at 142/128 (> 1.0).
         var frame = MakeFrame(0f, 1f, 0f, 32f / 128f);
+
         PixelFrameEditor.SetY(frame, 110, 128);
-        Assert.Equal(96f / 128f, frame.TopCoordinate,    precision: 4);
-        Assert.Equal(1f,         frame.BottomCoordinate, precision: 4);
+
+        Assert.Equal(110f / 128f, frame.TopCoordinate,    precision: 4);
+        Assert.Equal(142f / 128f, frame.BottomCoordinate, precision: 4);
     }
 
     [Fact]
-    public void SetY_Negative_ClampsToTopWall()
+    public void SetY_Negative_AllowsNegativeTop()
     {
-        // 32px-tall frame starting at y=64; setY=-5 → slide to wall
+        // 32px-tall frame; setY=-5 → top lands at -5/128 (< 0).
         var frame = MakeFrame(0f, 1f, 64f / 128f, 96f / 128f);
+
         PixelFrameEditor.SetY(frame, -5, 128);
-        Assert.Equal(0f,          frame.TopCoordinate,    precision: 4);
-        Assert.Equal(32f / 128f,  frame.BottomCoordinate, precision: 4);
+
+        Assert.Equal(-5f / 128f,  frame.TopCoordinate,    precision: 4);
+        Assert.Equal(27f / 128f,  frame.BottomCoordinate, precision: 4);
     }
 
     // ── SetWidth boundary clamping ────────────────────────────────────────────
@@ -261,14 +283,14 @@ public class PixelFrameEditorTests
     }
 
     [Fact]
-    public void SetWidth_OversizedWidth_ClampsRightToTextureBoundary()
+    public void SetWidth_OversizedWidth_AllowsExtensionPastTextureBoundary()
     {
-        // Frame at left=64/256; width=300 would push right to (64+300)/256 > 1.0
+        // Frame at left=64/256; width=300 → right lands at (64+300)/256 > 1.0.
+        // Frames are allowed to have a right edge beyond the texture.
         var frame = MakeFrame(64f / 256f, 96f / 256f, 0f, 1f);
         PixelFrameEditor.SetWidth(frame, 300, 256);
-        Assert.True(frame.RightCoordinate <= 1f,
-            $"RightCoordinate={frame.RightCoordinate} must not exceed 1.0");
-        Assert.Equal(64f / 256f, frame.LeftCoordinate, precision: 4);  // Left unchanged
+        Assert.Equal((64f + 300f) / 256f, frame.RightCoordinate, precision: 4);
+        Assert.Equal(64f / 256f,          frame.LeftCoordinate,  precision: 4);
     }
 
     // ── SetHeight boundary clamping ───────────────────────────────────────────
@@ -283,13 +305,12 @@ public class PixelFrameEditorTests
     }
 
     [Fact]
-    public void SetHeight_OversizedHeight_ClampsBottomToTextureBoundary()
+    public void SetHeight_OversizedHeight_AllowsExtensionPastTextureBoundary()
     {
-        // Frame at top=32/128; height=200 would push bottom past 1.0
+        // Frame at top=32/128; height=200 → bottom lands at (32+200)/128 > 1.0.
         var frame = MakeFrame(0f, 1f, 32f / 128f, 64f / 128f);
         PixelFrameEditor.SetHeight(frame, 200, 128);
-        Assert.True(frame.BottomCoordinate <= 1f,
-            $"BottomCoordinate={frame.BottomCoordinate} must not exceed 1.0");
-        Assert.Equal(32f / 128f, frame.TopCoordinate, precision: 4);  // Top unchanged
+        Assert.Equal((32f + 200f) / 128f, frame.BottomCoordinate, precision: 4);
+        Assert.Equal(32f / 128f,          frame.TopCoordinate,    precision: 4);
     }
 }
