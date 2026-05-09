@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
     private bool _suppressZoomComboChanged;
+    private bool _suppressPreviewZoomComboChanged;
 
     private FilePath SettingsFilePath =>
         (FilePath)(Path.GetDirectoryName(
@@ -507,6 +508,7 @@ public partial class MainWindow : Window
 
         PreviewZoomCombo.SelectionChanged += (_, _) =>
         {
+            if (_suppressPreviewZoomComboChanged) return;
             if (PreviewZoomCombo.SelectedItem is ComboBoxItem item &&
                 item.Content is string text)
             {
@@ -515,6 +517,30 @@ public partial class MainWindow : Window
                     PreviewCtrl.SetZoomPercent(pct);
             }
         };
+
+        PreviewCtrl.ZoomChanged += SyncPreviewZoomCombo;
+    }
+
+    private static readonly int[] _previewZoomPresets = { 10, 25, 50, 100, 200, 400 };
+
+    /// <summary>
+    /// Syncs the PreviewZoomCombo to the nearest preset for the given zoom
+    /// percentage. Suppression flag breaks the feedback loop with the
+    /// SelectionChanged handler that calls back into PreviewCtrl.SetZoomPercent.
+    /// </summary>
+    private void SyncPreviewZoomCombo(float zoomPercent)
+    {
+        int nearest = 0;
+        int bestDiff = int.MaxValue;
+        for (int i = 0; i < _previewZoomPresets.Length; i++)
+        {
+            int diff = Math.Abs(_previewZoomPresets[i] - (int)zoomPercent);
+            if (diff < bestDiff) { bestDiff = diff; nearest = i; }
+        }
+
+        _suppressPreviewZoomComboChanged = true;
+        PreviewZoomCombo.SelectedIndex = nearest;
+        _suppressPreviewZoomComboChanged = false;
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────
