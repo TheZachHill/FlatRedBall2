@@ -1345,9 +1345,31 @@ public class WireframeControl : Control
             return;
         }
 
+        UpdateHoverCursor(pos);
+
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
     }
+
+    private void UpdateHoverCursor(Point pos)
+    {
+        var (_, hitHandle) = HitTestHandle(pos);
+        Cursor = CursorFor(hitHandle);
+    }
+
+    private static Cursor CursorFor(HandleKind kind) => kind switch
+    {
+        HandleKind.Move        => new Cursor(StandardCursorType.SizeAll),
+        HandleKind.TopLeft     => new Cursor(StandardCursorType.TopLeftCorner),
+        HandleKind.BotRight    => new Cursor(StandardCursorType.BottomRightCorner),
+        HandleKind.TopRight    => new Cursor(StandardCursorType.TopRightCorner),
+        HandleKind.BotLeft     => new Cursor(StandardCursorType.BottomLeftCorner),
+        HandleKind.MidLeft or
+        HandleKind.MidRight    => new Cursor(StandardCursorType.SizeWestEast),
+        HandleKind.TopCenter or
+        HandleKind.BotCenter   => new Cursor(StandardCursorType.SizeNorthSouth),
+        _                      => Cursor.Default,
+    };
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
@@ -1371,6 +1393,7 @@ public class WireframeControl : Control
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
+        Cursor = Cursor.Default;
         if (_showPreview) { _showPreview = false; InvalidateVisual(); }
     }
 
