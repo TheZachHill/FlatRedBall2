@@ -1764,6 +1764,13 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 UndoManager.Self.Redo();
             }
+            else if ((e.Key == Key.Up || e.Key == Key.Down) &&
+                     e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            {
+                e.Handled = true;
+                int delta = e.Key == Key.Up ? -1 : +1;
+                AppCommands.Self.HandleReorder(delta);
+            }
         };
     }
 
