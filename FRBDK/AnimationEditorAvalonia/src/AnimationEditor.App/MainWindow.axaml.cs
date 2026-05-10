@@ -521,7 +521,7 @@ public partial class MainWindow : Window
             Height = 130,
             Content = new TextBlock
             {
-                Text = "AnimationEditor — Avalonia Port\n© FlatRedBall Contributors",
+                Text = "AnimationEditor: Avalonia Port\n© FlatRedBall Contributors",
                 Margin = new Avalonia.Thickness(16),
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap
             }
