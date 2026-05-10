@@ -946,18 +946,36 @@ public partial class MainWindow : Window
     /// <summary>
     /// Tunnel-phase PointerPressed: selects the tree node under the pointer on right-click so the
     /// context menu always acts on the item the user actually right-clicked, not the previous selection.
+    /// On left-button double-click over a frame node, centres the wireframe on that frame.
     /// We do NOT set e.Handled so normal selection and context-menu logic continues afterward.
     /// </summary>
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(AnimTree).Properties.IsRightButtonPressed) return;
+        var props = e.GetCurrentPoint(AnimTree).Properties;
 
-        // e.Source is the innermost visual under the pointer (e.g. the TextBlock in the DataTemplate).
-        // Walk up the visual tree to find the containing TreeViewItem.
-        if (e.Source is not Control src) return;
-        var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-        if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
-            AnimTree.SelectedItem = vm;
+        if (props.IsRightButtonPressed)
+        {
+            // e.Source is the innermost visual under the pointer (e.g. the TextBlock in the DataTemplate).
+            // Walk up the visual tree to find the containing TreeViewItem.
+            if (e.Source is not Control src) return;
+            var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+            if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
+                AnimTree.SelectedItem = vm;
+        }
+        else if (props.IsLeftButtonPressed && e.ClickCount == 2)
+        {
+            if (e.Source is not Control src) return;
+            var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+            if (tvi?.DataContext is TreeNodeVm { Data: AnimationFrameSave frame })
+            {
+                // Post at Background priority so we run after the higher-priority
+                // SelectionChanged → RefreshAll dispatch has completed.  This prevents
+                // a same-texture RefreshAll from overwriting our queued scroll.
+                Dispatcher.UIThread.Post(
+                    () => WireframeCtrl.CenterOnFrame(frame),
+                    DispatcherPriority.Background);
+            }
+        }
     }
 
     private void OnTreeContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
