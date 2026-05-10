@@ -1666,7 +1666,7 @@ public partial class MainWindow : Window
         };
 
         var tb = new TextBox { Text = initial };
-        var ok = new Button { Content = "OK" };
+        var ok = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
 
         ok.Click     += (_, _) => { tcs.TrySetResult(tb.Text); dialog.Close(); };
@@ -1716,7 +1716,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
 
-        var ok = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var ok = new Button { Content = "OK", IsDefault = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
         var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 12 };
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
         panel.Children.Add(ok);
@@ -1930,7 +1930,7 @@ public partial class MainWindow : Window
         };
         var incrToggle = new CheckBox { Content = "Increment UV", IsChecked = true };
 
-        var ok     = new Button { Content = "OK" };
+        var ok     = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => dialog.Close();
         cancel.Click += (_, _) => { countInput.Value = 0; dialog.Close(); };
@@ -1989,7 +1989,7 @@ public partial class MainWindow : Window
         adjustAllRow.IsVisible = false;
 
         bool confirmed = false;
-        var ok = new Button { Content = "OK" };
+        var ok = new Button { Content = "OK", IsDefault = true };
         ok.Click += (_, _) => { confirmed = true; dialog.Close(); };
         var cancel = new Button { Content = "Cancel" };
         cancel.Click += (_, _) => dialog.Close();
@@ -2124,7 +2124,7 @@ public partial class MainWindow : Window
         var hInput = new NumericUpDown { Value = oldH, Minimum = 1, Maximum = 65536, FormatString = "0", Width = 90 };
 
         bool confirmed = false;
-        var ok     = new Button { Content = "OK" };
+        var ok     = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => { confirmed = true; dialog.Close(); };
         cancel.Click += (_, _) => dialog.Close();
