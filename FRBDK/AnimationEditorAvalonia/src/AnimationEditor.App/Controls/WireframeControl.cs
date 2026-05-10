@@ -1178,6 +1178,40 @@ public class WireframeControl : Control
     }
 
     /// <summary>
+    /// Scrolls the wireframe panel so that <paramref name="frame"/>'s region is
+    /// centred in the viewport.  The current zoom level is preserved.
+    /// <para>
+    /// Does nothing when no bitmap is loaded or no ScrollViewer is attached.
+    /// </para>
+    /// </summary>
+    public void CenterOnFrame(AnimationFrameSave frame)
+    {
+        if (_bitmap is null || _scrollViewer is null) return;
+
+        float bmpW = _bitmap.Width;
+        float bmpH = _bitmap.Height;
+
+        float texCX = ((frame.LeftCoordinate + frame.RightCoordinate)  / 2f) * bmpW;
+        float texCY = ((frame.TopCoordinate  + frame.BottomCoordinate) / 2f) * bmpH;
+
+        float vpW = (float)_scrollViewer.Viewport.Width;
+        float vpH = (float)_scrollViewer.Viewport.Height;
+
+        float scrollX = Math.Max(0f, _panX + texCX * _zoom - vpW / 2f);
+        float scrollY = Math.Max(0f, _panY + texCY * _zoom - vpH / 2f);
+
+        // Clamp to the current max scroll so TryApplyPendingScroll's extent guard
+        // does not defer the scroll indefinitely when the frame is near the far edge.
+        if (_scrollViewer.Extent.Width > 0)
+            scrollX = Math.Min(scrollX, (float)Math.Max(0, _scrollViewer.Extent.Width  - vpW));
+        if (_scrollViewer.Extent.Height > 0)
+            scrollY = Math.Min(scrollY, (float)Math.Max(0, _scrollViewer.Extent.Height - vpH));
+
+        CancelPendingScrollApply(x: scrollX, y: scrollY);
+        QueueScrollAfterLayout(scrollX, scrollY);
+    }
+
+    /// <summary>
     /// Returns a snapshot of the frame rectangles currently tracked by the control.
     /// Bounds are in texture-space pixel coordinates; call after
     /// <see cref="RefreshFrames"/> to ensure the list is current.
