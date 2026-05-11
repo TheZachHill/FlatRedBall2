@@ -55,10 +55,13 @@ public class PreviewControl : Control
     private bool _draggingHGuide;                  // true = horizontal guide
 
     // -- Shape drag -----------------------------------------------------------
-    private object? _draggingShape;   // AxisAlignedRectangleSave or CircleSave
-    private float   _shapeDragStartX;
-    private float   _shapeDragStartY;
-    private Point   _shapeDragAnchor;
+    private object?    _draggingShape;   // AxisAlignedRectangleSave or CircleSave
+    private float      _shapeDragStartX;
+    private float      _shapeDragStartY;
+    private Point      _shapeDragAnchor;
+    private HandleKind _shapeResizeHandle  = HandleKind.None;
+    private float      _shapeDragStartScaleX;  // rect ScaleX or circle Radius at drag start
+    private float      _shapeDragStartScaleY;  // rect ScaleY at drag start (0 for circle)
 
     // ΓöÇΓöÇ Public properties ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
@@ -299,7 +302,38 @@ public class PreviewControl : Control
     }
 
     /// <summary>
-    /// Test-only: simulates a single mouse-wheel zoom event toward the given
+    /// Test-only: applies new shape dimensions to the currently selected shape and commits a resize.
+    /// Bypasses coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier.
+    /// For rectangles: <paramref name="newParam1"/> = ScaleX, <paramref name="newParam2"/> = ScaleY.
+    /// For circles:    <paramref name="newParam1"/> = Radius,  <paramref name="newParam2"/> is ignored.
+    /// </summary>
+    internal void SimulateShapeResize(HandleKind handle, float newParam1, float newParam2 = 0f)
+    {
+        _draggingShape = _selectedState!.SelectedShape;
+        if (_draggingShape is null) return;
+
+        _shapeResizeHandle = handle;
+
+        if (_draggingShape is AxisAlignedRectangleSave r)
+        {
+            _shapeDragStartX      = r.X;
+            _shapeDragStartY      = r.Y;
+            _shapeDragStartScaleX = r.ScaleX;
+            _shapeDragStartScaleY = r.ScaleY;
+            r.ScaleX = newParam1;
+            r.ScaleY = newParam2;
+        }
+        else if (_draggingShape is CircleSave c)
+        {
+            _shapeDragStartX      = c.X;
+            _shapeDragStartY      = c.Y;
+            _shapeDragStartScaleX = c.Radius;
+            _shapeDragStartScaleY = 0f;
+            c.Radius = newParam1;
+        }
+
+        CommitShapeResize();
+    }
     /// control-space point. Mirrors <see cref="OnPointerWheelChanged"/> so
     /// headless tests can drive the same code path without synthesising
     /// pointer events.
@@ -520,7 +554,15 @@ public class PreviewControl : Control
     {
         if (_draggingShape is not null)
         {
-            Cursor = new Cursor(StandardCursorType.SizeAll);
+            Cursor = new Cursor(_shapeResizeHandle != HandleKind.None
+                ? GetResizeCursor(_shapeResizeHandle)
+                : StandardCursorType.SizeAll);
+            return;
+        }
+        var handle = HitTestShapeHandle((float)pos.X, (float)pos.Y);
+        if (handle != HandleKind.None)
+        {
+            Cursor = new Cursor(GetResizeCursor(handle));
             return;
         }
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
@@ -530,6 +572,13 @@ public class PreviewControl : Control
             cursorType = StandardCursorType.SizeAll;
         Cursor = cursorType is null ? Cursor.Default : new Cursor(cursorType.Value);
     }
+
+    private static StandardCursorType GetResizeCursor(HandleKind kind) => kind switch
+    {
+        HandleKind.TopCenter or HandleKind.BotCenter => StandardCursorType.SizeNorthSouth,
+        HandleKind.MidLeft   or HandleKind.MidRight  => StandardCursorType.SizeWestEast,
+        _ => StandardCursorType.SizeAll,
+    };
 
     /// <summary>
     /// Captures a thread-safe snapshot of collision shapes attached to the currently
@@ -682,6 +731,163 @@ public class PreviewControl : Control
     }
 
     /// <summary>
+    /// Returns the resize <see cref="HandleKind"/> under the cursor for the currently selected
+    /// shape, or <see cref="HandleKind.None"/> if no resize handle is hit.
+    /// Handles are positioned outside the bounding box by <c>Hs</c> pixels.
+    /// </summary>
+    private HandleKind HitTestShapeHandle(float px, float py)
+    {
+        var sel = _selectedState!.SelectedShape;
+        if (sel is null || _selectedState!.SelectedFrame is null) return HandleKind.None;
+        if (px < RulerSize || py < RulerSize) return HandleKind.None;
+
+        float cx = GetCenterX();
+        float cy = GetCenterY();
+        float om = _appState!.OffsetMultiplier * _zoom;
+        const float Hs = 5f;
+
+        float left, top, right, bottom;
+        if (sel is AxisAlignedRectangleSave r)
+        {
+            float sx = cx + r.X * om;
+            float sy = cy - r.Y * om;
+            float hw = r.ScaleX * om;
+            float hh = r.ScaleY * om;
+            left = sx - hw; right  = sx + hw;
+            top  = sy - hh; bottom = sy + hh;
+        }
+        else if (sel is CircleSave c)
+        {
+            float sx = cx + c.X * om;
+            float sy = cy - c.Y * om;
+            float sr = c.Radius * om;
+            left = sx - sr; right  = sx + sr;
+            top  = sy - sr; bottom = sy + sr;
+        }
+        else return HandleKind.None;
+
+        var kind = DragHandleHitTester.GetHandleAt(px, py, left, top, right, bottom,
+            hitRadius: Hs, handleOffset: Hs);
+        // Only return resize handles; body clicks are handled by the existing HitTestShape path.
+        return kind is HandleKind.None or HandleKind.Move ? HandleKind.None : kind;
+    }
+
+    /// <summary>
+    /// Applies the in-progress shape resize based on the current screen-space pointer position.
+    /// Called from <see cref="OnPointerMoved"/> while <see cref="_shapeResizeHandle"/> is active.
+    /// </summary>
+    private void ApplyShapeResize(Point pos)
+    {
+        if (_draggingShape is null || _shapeResizeHandle == HandleKind.None) return;
+
+        float om = _appState!.OffsetMultiplier * _zoom;
+        float worldDX = ((float)(pos.X - _shapeDragAnchor.X)) / om;
+        float worldDY = -((float)(pos.Y - _shapeDragAnchor.Y)) / om; // Y flip: screen↓ = world↓
+
+        if (_draggingShape is CircleSave circle)
+        {
+            // Use signed delta projected onto the handle's outward direction.
+            float delta = _shapeResizeHandle switch
+            {
+                HandleKind.MidRight   =>  worldDX,
+                HandleKind.MidLeft    => -worldDX,
+                HandleKind.TopCenter  =>  worldDY,
+                HandleKind.BotCenter  => -worldDY,
+                HandleKind.TopRight   => (worldDX + worldDY) / 2f,
+                HandleKind.TopLeft    => (-worldDX + worldDY) / 2f,
+                HandleKind.BotRight   => (worldDX - worldDY) / 2f,
+                HandleKind.BotLeft    => (-worldDX - worldDY) / 2f,
+                _ => 0f,
+            };
+            circle.Radius = MathF.Max(0.5f, _shapeDragStartScaleX + delta);
+        }
+        else if (_draggingShape is AxisAlignedRectangleSave r)
+        {
+            float startLeft   = _shapeDragStartX - _shapeDragStartScaleX;
+            float startRight  = _shapeDragStartX + _shapeDragStartScaleX;
+            float startTop    = _shapeDragStartY + _shapeDragStartScaleY; // world Y up
+            float startBottom = _shapeDragStartY - _shapeDragStartScaleY;
+
+            float newLeft   = startLeft,  newRight  = startRight;
+            float newTop    = startTop,   newBottom = startBottom;
+
+            switch (_shapeResizeHandle)
+            {
+                case HandleKind.MidRight:   newRight  = startRight  + worldDX; break;
+                case HandleKind.MidLeft:    newLeft   = startLeft   + worldDX; break;
+                case HandleKind.TopCenter:  newTop    = startTop    + worldDY; break;
+                case HandleKind.BotCenter:  newBottom = startBottom + worldDY; break;
+                case HandleKind.TopRight:   newRight  = startRight  + worldDX; newTop    = startTop    + worldDY; break;
+                case HandleKind.TopLeft:    newLeft   = startLeft   + worldDX; newTop    = startTop    + worldDY; break;
+                case HandleKind.BotRight:   newRight  = startRight  + worldDX; newBottom = startBottom + worldDY; break;
+                case HandleKind.BotLeft:    newLeft   = startLeft   + worldDX; newBottom = startBottom + worldDY; break;
+            }
+
+            const float minSize = 1f; // minimum 1 world unit on each axis
+            if (newRight - newLeft < minSize)
+            {
+                if (_shapeResizeHandle is HandleKind.MidLeft or HandleKind.TopLeft or HandleKind.BotLeft)
+                    newLeft = newRight - minSize;
+                else
+                    newRight = newLeft + minSize;
+            }
+            if (newTop - newBottom < minSize)
+            {
+                if (_shapeResizeHandle is HandleKind.TopCenter or HandleKind.TopRight or HandleKind.TopLeft)
+                    newTop = newBottom + minSize;
+                else
+                    newBottom = newTop - minSize;
+            }
+
+            r.X      = (newLeft   + newRight)  / 2f;
+            r.Y      = (newTop    + newBottom)  / 2f;
+            r.ScaleX = (newRight  - newLeft)    / 2f;
+            r.ScaleY = (newTop    - newBottom)  / 2f;
+        }
+    }
+
+    /// <summary>
+    /// Finalises an in-progress shape resize: records an undo command (unless the delta is
+    /// negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
+    /// saves, and re-assigns the selection so the property panel refreshes.
+    /// </summary>
+    private void CommitShapeResize()
+    {
+        if (_draggingShape is null || _shapeResizeHandle == HandleKind.None) return;
+
+        float newX, newY, newP1, newP2;
+        if (_draggingShape is AxisAlignedRectangleSave r)
+            { newX = r.X; newY = r.Y; newP1 = r.ScaleX; newP2 = r.ScaleY; }
+        else
+            { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; newP1 = c.Radius; newP2 = 0f; }
+
+        const float eps = 1e-4f;
+        bool changed = MathF.Abs(newX  - _shapeDragStartX)      > eps
+                    || MathF.Abs(newY  - _shapeDragStartY)       > eps
+                    || MathF.Abs(newP1 - _shapeDragStartScaleX)  > eps
+                    || MathF.Abs(newP2 - _shapeDragStartScaleY)  > eps;
+
+        if (changed)
+        {
+            var frame = _selectedState!.SelectedFrame;
+            if (frame is not null)
+                _undoManager!.Record(new ResizeShapeCommand(
+                    frame, _draggingShape,
+                    _shapeDragStartX, _shapeDragStartY, _shapeDragStartScaleX, _shapeDragStartScaleY,
+                    newX, newY, newP1, newP2,
+                    _appCommands!, _events!));
+            _events!.RaiseAnimationChainsChanged();
+            _appCommands!.SaveCurrentAnimationChainList();
+        }
+
+        if (_draggingShape is AxisAlignedRectangleSave rs) _selectedState!.SelectedRectangle = rs;
+        else if (_draggingShape is CircleSave cs)          _selectedState!.SelectedCircle    = cs;
+
+        _shapeResizeHandle = HandleKind.None;
+        _draggingShape     = null;
+    }
+
+    /// <summary>
     /// Selects the topmost collision shape under (<paramref name="px"/>, <paramref name="py"/>)
     /// in screen space. Circles are checked before rectangles because they are rendered on top.
     /// Within each type, shapes are iterated in reverse render order so the last-drawn (topmost)
@@ -812,6 +1018,32 @@ public class PreviewControl : Control
         }
 
         // No guide hit — try to drag a shape (or just select one).
+
+        // Check resize handles on the selected shape first.
+        var handleKind = HitTestShapeHandle(px, py);
+        if (handleKind != HandleKind.None)
+        {
+            var sel = _selectedState!.SelectedShape!;
+            _draggingShape   = sel;
+            _shapeDragAnchor = pos;
+            if (sel is AxisAlignedRectangleSave dhr)
+            {
+                _shapeDragStartX      = dhr.X;
+                _shapeDragStartY      = dhr.Y;
+                _shapeDragStartScaleX = dhr.ScaleX;
+                _shapeDragStartScaleY = dhr.ScaleY;
+            }
+            else if (sel is CircleSave dhc)
+            {
+                _shapeDragStartX      = dhc.X;
+                _shapeDragStartY      = dhc.Y;
+                _shapeDragStartScaleX = dhc.Radius;
+                _shapeDragStartScaleY = 0f;
+            }
+            _shapeResizeHandle = handleKind;
+            e.Pointer.Capture(this);
+            return;
+        }
         var hitShape = HitTestShape(px, py);
         if (hitShape is not null)
         {
@@ -845,6 +1077,13 @@ public class PreviewControl : Control
         }
 
 
+        if (_shapeResizeHandle != HandleKind.None)
+        {
+            ApplyShapeResize(pos);
+            InvalidateVisual();
+            return;
+        }
+
         if (_draggingShape is not null)
         {
             float om = _appState!.OffsetMultiplier * _zoom;
@@ -873,6 +1112,15 @@ public class PreviewControl : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+
+        if (_shapeResizeHandle != HandleKind.None)
+        {
+            CommitShapeResize();
+            e.Pointer.Capture(null);
+            return;
+        }
+
 
         if (_draggingShape is not null)
         {
@@ -1030,10 +1278,26 @@ public class PreviewControl : Control
                     float hw = sh.Param1 * om;
                     float hh = sh.Param2 * om;
                     canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
+                    if (sh.IsSelected)
+                        DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
                 }
                 else
                 {
                     canvas.DrawCircle(sx, sy, sh.Param1 * om, paint);
+                    if (sh.IsSelected)
+                    {
+                        float sr = sh.Param1 * om;
+                        // Draw the bounding square outline for the circle so handles have context.
+                        using var boxPaint = new SKPaint
+                        {
+                            Color       = new SKColor(255, 220, 0, 120),
+                            Style       = SKPaintStyle.Stroke,
+                            StrokeWidth = 1f,
+                            PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
+                        };
+                        canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
+                        DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
+                    }
                 }
             }
         }
@@ -1210,6 +1474,35 @@ public class PreviewControl : Control
             IsStroke    = true
         };
         canvas.DrawRect(dst, op);
+    }
+
+    /// <summary>
+    /// Draws the 8 resize handles (white fill + DodgerBlue stroke) outside the bounding box
+    /// defined by <paramref name="left"/>, <paramref name="top"/>, <paramref name="right"/>,
+    /// <paramref name="bottom"/>. All coordinates are in screen space.
+    /// </summary>
+    private static void DrawShapeHandles(SKCanvas canvas, float left, float top, float right, float bottom)
+    {
+        const float Hs = 5f; // half the handle square side length
+        float cx = (left + right)   / 2f;
+        float cy = (top  + bottom)  / 2f;
+
+        (float x, float y)[] pts =
+        {
+            (left  - Hs, top    - Hs), (cx, top    - Hs), (right + Hs, top    - Hs),
+            (left  - Hs, cy),                              (right + Hs, cy),
+            (left  - Hs, bottom + Hs), (cx, bottom + Hs), (right + Hs, bottom + Hs),
+        };
+
+        using var fill   = new SKPaint { Color = SKColors.White,     Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f };
+
+        foreach (var (hx, hy) in pts)
+        {
+            var hr = new SKRect(hx - Hs, hy - Hs, hx + Hs, hy + Hs);
+            canvas.DrawRect(hr, fill);
+            canvas.DrawRect(hr, stroke);
+        }
     }
 
     private sealed class DrawOp : ICustomDrawOperation
