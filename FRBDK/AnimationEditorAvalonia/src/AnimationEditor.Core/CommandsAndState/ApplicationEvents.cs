@@ -3,8 +3,9 @@ using System;
 
 namespace AnimationEditor.Core.CommandsAndState
 {
-    public class ApplicationEvents : Singleton<ApplicationEvents>
+    public class ApplicationEvents : IApplicationEvents
     {
+        public static ApplicationEvents Self { get; set; }
         public event Action AfterZoomChange;
         public event Action WireframePanning;
         public event Action WireframeTextureChange;

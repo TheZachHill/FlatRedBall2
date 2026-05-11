@@ -254,7 +254,7 @@ public class TreeBuilderSingletonTests
         acls.AnimationChains.Add(chain);
         var vm = new TreeNodeVm { Data = chain };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
 
         Assert.True(handled);
         Assert.Same(chain, AnimationEditor.Core.SelectedState.Self.SelectedChain);
@@ -268,7 +268,7 @@ public class TreeBuilderSingletonTests
         var frame = chain.Frames[0];
         var vm    = new TreeNodeVm { Data = frame };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
 
         Assert.True(handled);
         Assert.Same(frame, AnimationEditor.Core.SelectedState.Self.SelectedFrame);
@@ -277,11 +277,11 @@ public class TreeBuilderSingletonTests
     [Fact]
     public void RouteNodeSelection_RectangleNode_SetsSelectedRectangle()
     {
-        TestHelpers.SetupFreshAcls();
+        var acls = TestHelpers.SetupFreshAcls();
         var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
         var vm   = new TreeNodeVm { Data = rect };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
 
         Assert.True(handled);
         Assert.Same(rect, AnimationEditor.Core.SelectedState.Self.SelectedRectangle);
@@ -290,11 +290,11 @@ public class TreeBuilderSingletonTests
     [Fact]
     public void RouteNodeSelection_CircleNode_SetsSelectedCircle()
     {
-        TestHelpers.SetupFreshAcls();
+        var acls   = TestHelpers.SetupFreshAcls();
         var circle = new CircleSave { Name = "HurtCircle" };
         var vm     = new TreeNodeVm { Data = circle };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
 
         Assert.True(handled);
         Assert.Same(circle, AnimationEditor.Core.SelectedState.Self.SelectedCircle);
@@ -303,10 +303,10 @@ public class TreeBuilderSingletonTests
     [Fact]
     public void RouteNodeSelection_NullData_ReturnsFalse()
     {
-        TestHelpers.SetupFreshAcls();
+        var acls = TestHelpers.SetupFreshAcls();
         var vm = new TreeNodeVm { Data = null };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
 
         Assert.False(handled);
     }
@@ -330,7 +330,7 @@ public class TreeBuilderSingletonTests
         Assert.Same(circle, SelectedState.Self.SelectedCircle);
 
         // Re-click the same frame node — must clear the circle
-        TreeBuilder.RouteNodeSelection(new TreeNodeVm { Data = frame });
+        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
 
         Assert.Null(SelectedState.Self.SelectedCircle);
         Assert.Same(frame, SelectedState.Self.SelectedFrame);
@@ -348,7 +348,7 @@ public class TreeBuilderSingletonTests
         SelectedState.Self.SelectedRectangle = rect;
         Assert.Same(rect, SelectedState.Self.SelectedRectangle);
 
-        TreeBuilder.RouteNodeSelection(new TreeNodeVm { Data = frame });
+        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
 
         Assert.Null(SelectedState.Self.SelectedRectangle);
         Assert.Same(frame, SelectedState.Self.SelectedFrame);
@@ -362,11 +362,11 @@ public class TreeBuilderSingletonTests
         var frame = chain.Frames[0];
 
         // Select the frame first.
-        TreeBuilder.RouteNodeSelection(new TreeNodeVm { Data = frame });
+        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
         Assert.Same(frame, AnimationEditor.Core.SelectedState.Self.SelectedFrame);
 
         // Now select the parent chain — SelectedFrame must be cleared.
-        TreeBuilder.RouteNodeSelection(new TreeNodeVm { Data = chain });
+        TreeBuilder.RouteNodeSelection(chain, SelectedState.Self, acls);
 
         Assert.Null(AnimationEditor.Core.SelectedState.Self.SelectedFrame);
         Assert.Same(chain, AnimationEditor.Core.SelectedState.Self.SelectedChain);

@@ -13,8 +13,16 @@ namespace AnimationEditor.Core
         public AnimationFrameSave AnimationFrameSave;
     }
 
-    public class SelectedState : Singleton<SelectedState>
+    public class SelectedState : ISelectedState
     {
+        public static SelectedState Self { get; set; }
+
+        private readonly IProjectManager _pm;
+
+        public SelectedState(IProjectManager pm)
+        {
+            _pm = pm;
+        }
         private AnimationChainSave _selectedChain;
         private AnimationFrameSave _selectedFrame;
         private AxisAlignedRectangleSave _selectedRectangle;
@@ -26,7 +34,7 @@ namespace AnimationEditor.Core
         public event Action SelectionChanged;
 
         public AnimationChainListSave AnimationChainListSave =>
-            ProjectManager.Self.AnimationChainListSave;
+            _pm.AnimationChainListSave;
 
         public AnimationChainSave SelectedChain
         {
@@ -135,7 +143,7 @@ namespace AnimationEditor.Core
                     ?? (_selectedChain?.Frames.Count > 0 ? _selectedChain.Frames[0].TextureName : null);
 
                 if (!string.IsNullOrEmpty(fileName))
-                    return ProjectManager.Self.TileMapInformationList.GetTileMapInformation(fileName);
+                    return _pm.TileMapInformationList.GetTileMapInformation(fileName);
 
                 return null;
             }
