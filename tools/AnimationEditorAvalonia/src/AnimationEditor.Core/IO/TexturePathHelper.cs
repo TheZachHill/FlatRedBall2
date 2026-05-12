@@ -1,4 +1,5 @@
 using System.IO;
+using AnimationEditor.Core.Paths;
 
 namespace AnimationEditor.Core.IO;
 
@@ -24,7 +25,8 @@ public static class TexturePathHelper
         if (string.IsNullOrEmpty(achxFolder))
             return absoluteTexturePath;
 
-        return Path.GetRelativePath(achxFolder, absoluteTexturePath).Replace('\\', '/');
+        // Route through FilePath so Windows drive prefixes are recognized as absolute on Linux too.
+        return new FilePath(absoluteTexturePath).RelativeTo(new FilePath(achxFolder));
     }
 
     /// <summary>
@@ -42,18 +44,24 @@ public static class TexturePathHelper
     public static string ComputeDisplayPath(string? framePath, string? achxPath)
     {
         if (string.IsNullOrEmpty(framePath)) return string.Empty;
-        if (!Path.IsPathRooted(framePath)) return framePath;
+        // Use FilePath's drive-aware absoluteness check (Path.IsPathRooted misses C:/... on Linux).
+        var frameFilePath = new FilePath(framePath);
+        if (!IsAbsolute(framePath)) return framePath;
         if (string.IsNullOrEmpty(achxPath)) return framePath;
 
-        string achxFolder = Path.GetDirectoryName(achxPath) ?? string.Empty;
-        if (string.IsNullOrEmpty(achxFolder)) return framePath;
+        var achxFolder = new FilePath(achxPath).GetDirectoryContainingThis();
+        if (string.IsNullOrEmpty(achxFolder.FullPath)) return framePath;
 
         string rel;
-        try { rel = Path.GetRelativePath(achxFolder, framePath).Replace('\\', '/'); }
+        try { rel = frameFilePath.RelativeTo(achxFolder); }
         catch (System.ArgumentException) { return framePath; }
 
-        // Path.GetRelativePath returns the absolute path unchanged when it cannot make a relative
-        // path (e.g., the texture is on a different drive than the .achx).
-        return Path.IsPathRooted(rel) ? framePath : rel;
+        // RelativeTo returns the absolute path unchanged when it cannot make a relative path
+        // (e.g., the texture is on a different drive than the .achx).
+        return IsAbsolute(rel) ? framePath : rel;
     }
+
+    private static bool IsAbsolute(string path)
+        => Path.IsPathRooted(path)
+           || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':');
 }
