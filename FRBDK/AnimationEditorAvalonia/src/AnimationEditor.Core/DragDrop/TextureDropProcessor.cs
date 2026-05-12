@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Paths;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.IO;
@@ -27,8 +28,10 @@ public static class TextureDropProcessor
         }
         else
         {
-            var achxFolder = Path.GetDirectoryName(achxFileName) ?? string.Empty;
-            relativeTexturePath = Path.GetRelativePath(achxFolder, droppedFilePath).Replace('\\', '/');
+            // Route through FilePath so Windows-style drive prefixes are recognized as absolute
+            // on Linux too (stdlib Path.GetDirectoryName/GetRelativePath only honor / on Linux).
+            var achxFolder = new FilePath(achxFileName).GetDirectoryContainingThis();
+            relativeTexturePath = new FilePath(droppedFilePath).RelativeTo(achxFolder);
         }
 
         if (targetFrame is not null)

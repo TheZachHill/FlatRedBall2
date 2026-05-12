@@ -156,6 +156,10 @@ public class FilePath : IComparable, IEquatable<FilePath>
     private static bool IsRelative(string fileName)
     {
         if (fileName == null) throw new ArgumentException("Cannot check if a null file name is relative.");
+        // Windows drive prefix ("C:..."): Path.IsPathRooted returns false on Linux for these,
+        // which would silently turn a Windows-authored absolute path into a relative one. AE
+        // files may originate cross-platform, so recognize the drive form regardless of host.
+        if (fileName.Length >= 2 && char.IsLetter(fileName[0]) && fileName[1] == ':') return false;
         try { return !Path.IsPathRooted(fileName); }
         catch (ArgumentException e) { throw new ArgumentException($"Argument exception on {fileName}", e); }
     }
