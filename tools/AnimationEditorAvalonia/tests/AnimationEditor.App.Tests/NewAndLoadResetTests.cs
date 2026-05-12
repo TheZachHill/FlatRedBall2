@@ -98,6 +98,39 @@ public class NewAndLoadResetTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// File → New must reset SelectedChain even when selection was made via the tree.
+    /// In a real window Avalonia fires AnimTree.SelectionChanged when _treeRoots is
+    /// cleared; the handler must not re-apply the stale tree item after Reset().
+    /// </summary>
+    [AvaloniaFact]
+    public void New_ClearsSelection_WhenSelectedViaTree()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.AppCommands.AddAnimationChainWithName("Walk");
+            Dispatcher.UIThread.RunJobs();
+
+            var tree  = window.FindControl<TreeView>("AnimTree")!;
+            var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
+            Assert.NotEmpty(roots);
+
+            // Simulate the user clicking the chain node in the tree
+            tree.SelectedItem = roots[0];
+            Dispatcher.UIThread.RunJobs();
+
+            // File → New
+            window.FindControl<MenuItem>("MenuNew")!
+                  .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Null(ctx.SelectedState.SelectedChain);
+            Assert.Null(ctx.SelectedState.SelectedFrame);
+        }
+        finally { window.Close(); }
+    }
+
     // ── File → Load ───────────────────────────────────────────────────────────
 
     /// <summary>
