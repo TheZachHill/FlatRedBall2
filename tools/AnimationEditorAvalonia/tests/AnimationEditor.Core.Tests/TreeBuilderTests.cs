@@ -148,7 +148,7 @@ public class TreeBuilderPureTests
     public void BuildFrameHeader_WithNoTextureName_ReturnsFrameIndexLabel()
     {
         var frame = new AnimationFrameSave { TextureName = "" };
-        Assert.Equal("<UNTEXTURED>", TreeBuilder.BuildFrameHeader(frame));
+        Assert.Equal("Frame 1", TreeBuilder.BuildFrameHeader(frame, 0));
     }
 
     [Fact]
@@ -169,6 +169,28 @@ public class TreeBuilderPureTests
         Assert.Equal(2, node.Children.Count);
         Assert.Equal("HitBox",     node.Children[0].Header);
         Assert.Equal("HurtCircle", node.Children[1].Header);
+    }
+
+    [Fact]
+    public void BuildFrameNode_SetsNodeFlags_ForFrameAndShapes()
+    {
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "",
+            ShapesSave = new ShapesSave()
+        };
+        frame.ShapesSave!.AARectSaves.Add(new AARectSave { Name = "Rect1" });
+        frame.ShapesSave!.CircleSaves.Add(new CircleSave { Name = "Circle1" });
+
+        var node = TreeBuilder.BuildFrameNode(frame, index: 1);
+
+        Assert.True(node.IsFrameNode);
+        Assert.Equal("Frame 2", node.Header);
+        Assert.Equal(NodeKind.Frame, node.Kind);
+        Assert.Equal(NodeKind.RectShape, node.Children[0].Kind);
+        Assert.True(node.Children[0].IsRectNode);
+        Assert.Equal(NodeKind.CircleShape, node.Children[1].Kind);
+        Assert.True(node.Children[1].IsCircleNode);
     }
 
     // ── GetExpandedChainNames ─────────────────────────────────────────────────

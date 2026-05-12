@@ -354,8 +354,16 @@ namespace AnimationEditor.Core.CommandsAndState
 
             var name = await PromptStringAsync("Add Animation", "Animation name:", defaultName);
             if (name is null) return;
+            AddAnimationChainWithName(name);
+        }
+
+        public AnimationChainSave? AddAnimationChainWithName(string name)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls is null) return null;
+
             name = name.Trim();
-            if (string.IsNullOrEmpty(name)) return;
+            if (string.IsNullOrEmpty(name)) return null;
 
             name = StringFunctions.MakeStringUnique(name, acls.AnimationChains.Select(c => c.Name).ToList());
             var chain = new AnimationChainSave { Name = name };
@@ -367,6 +375,7 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             _undoManager.Record(new AddChainCommand(chain, acls, insertedAtIndex, this, _events));
+            return chain;
         }
 
         /// <summary>

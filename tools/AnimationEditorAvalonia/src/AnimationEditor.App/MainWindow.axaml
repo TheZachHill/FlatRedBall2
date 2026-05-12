@@ -181,7 +181,7 @@
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
-                            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                            <Grid ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Node kind icons: SVG files are the single source of truth for path data. -->
                                     <svg:Svg IsVisible="{Binding IsChainNode}"
@@ -229,15 +229,18 @@
                                                  VerticalContentAlignment="Center"
                                                  HorizontalAlignment="Stretch" />
                                     </Panel>
-                                    <TextBlock Text="{Binding Meta}"
-                                               Foreground="{StaticResource InkDim}"
-                                               FontSize="10"
-                                               Margin="6,0,0,0"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                 </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Meta}"
+                                           Foreground="{StaticResource InkDim}"
+                                           FontSize="10"
+                                           Margin="8,0,6,0"
+                                           HorizontalAlignment="Right"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                 <!-- Inline "Add Frame" button — only visible on chain nodes; shown on hover -->
-                                <Button Grid.Column="1"
+                                <Button Grid.Column="2"
                                         Classes="add-frame-btn plus"
                                         IsVisible="{Binding IsChainNode}"
                                         Width="18" Height="18"
@@ -369,6 +372,10 @@
                                     <AutoCompleteBox.Styles>
                                         <Style Selector="TextBox">
                                             <Setter Property="TextAlignment" Value="Center"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                            <Setter Property="Padding" Value="4,0"/>
+                                            <Setter Property="MinHeight" Value="0"/>
+                                            <Setter Property="FontSize" Value="11"/>
                                         </Style>
                                     </AutoCompleteBox.Styles>
                                 </AutoCompleteBox>
@@ -415,11 +422,12 @@
                                     <TextBlock Text="Onion Skin" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
-                            <CheckBox x:Name="ShowGuidesCheck"
-                                      Foreground="{StaticResource Ink}"
-                                      VerticalAlignment="Center"
-                                      Margin="4,0,4,0"
-                                      ToolTip.Tip="Show guides">
+                            <ToggleButton x:Name="ShowGuidesCheck"
+                                          Height="26"
+                                          Foreground="{StaticResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="4,0,4,0"
+                                          ToolTip.Tip="Show guides">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
                                              Path="avares://AnimationEditor.App/Assets/icons/svg/IconGuides.svg"
@@ -427,7 +435,7 @@
                                              VerticalAlignment="Center" />
                                     <TextBlock Text="Guides" VerticalAlignment="Center" />
                                 </StackPanel>
-                            </CheckBox>
+                            </ToggleButton>
 
                             <!-- Divider -->
                             <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
@@ -522,26 +530,31 @@
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:Int32">
-                                            <Border Width="36" Height="38"
-                                                    BorderBrush="{StaticResource LineBrush}"
-                                                    BorderThickness="0,0,1,0"
-                                                    Background="Transparent">
-                                                <StackPanel VerticalAlignment="Center"
-                                                            HorizontalAlignment="Center"
-                                                            Spacing="2">
-                                                    <!-- thumbnail placeholder -->
-                                                    <Border Width="22" Height="18"
-                                                            Background="{StaticResource BgCanvas}"
-                                                            BorderBrush="{StaticResource LineStrong}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="2" />
-                                                    <TextBlock Text="{Binding}"
-                                                               HorizontalAlignment="Center"
-                                                               FontSize="9"
-                                                               Foreground="{StaticResource InkDim}" />
-                                                </StackPanel>
-                                            </Border>
+                                        <DataTemplate x:DataType="models:TimelineFrameVm">
+                                            <Grid Width="{Binding Width}" Height="38">
+                                                <Border BorderBrush="{StaticResource LineBrush}"
+                                                        BorderThickness="0,0,1,0"
+                                                        Background="Transparent">
+                                                    <StackPanel VerticalAlignment="Center"
+                                                                HorizontalAlignment="Center"
+                                                                Spacing="2">
+                                                        <!-- thumbnail placeholder -->
+                                                        <Border Width="22" Height="18"
+                                                                Background="{StaticResource BgCanvas}"
+                                                                BorderBrush="{StaticResource LineStrong}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="2" />
+                                                        <TextBlock Text="{Binding IndexLabel}"
+                                                                   HorizontalAlignment="Center"
+                                                                   FontSize="9"
+                                                                   Foreground="{StaticResource InkDim}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Height="2"
+                                                        VerticalAlignment="Top"
+                                                        Background="{StaticResource Accent}"
+                                                        IsVisible="{Binding IsCurrent}" />
+                                            </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

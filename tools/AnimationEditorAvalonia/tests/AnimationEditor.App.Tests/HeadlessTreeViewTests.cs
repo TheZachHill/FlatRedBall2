@@ -6,6 +6,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -188,6 +189,28 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             Assert.Contains("Add AnimationChain", ContextMenuHeaders(window));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void AddChainButton_Click_StartsInlineRenameOnCreatedChain()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            // Avoid dialog interaction if AddChain still routes through PromptStringAsync.
+            ctx.AppCommands.PromptStringAsync = (_, _, initial) => Task.FromResult<string?>(initial);
+
+            var addChainBtn = window.FindControl<Button>("AddChainBtn")
+                ?? throw new InvalidOperationException("AddChainBtn not found");
+            addChainBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            var roots = GetRoots(GetTree(window));
+            Assert.Single(roots);
+            Assert.True(roots[0].IsEditing);
+            Assert.Equal(roots[0].Header, roots[0].EditingText);
         }
         finally { window.Close(); }
     }
@@ -530,6 +553,64 @@ public class HeadlessTreeViewTests
 
             Assert.Single(chain.Frames);
             Assert.Same(chain.Frames[0], ctx.SelectedState.SelectedFrame);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RefreshChainNode_UpdatesChainMetaFrameCount()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Run" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var roots = GetRoots(GetTree(window));
+            Assert.Equal("0 fr", roots[0].Meta);
+
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() });
+            ctx.AppCommands.RefreshTreeNode(chain);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("1 fr", roots[0].Meta);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void PropFrameLen_ValueChanged_UpdatesFrameMetaImmediately()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var frame = new AnimationFrameSave
+            {
+                TextureName = "Tex.png",
+                FrameLength = 0.1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chain = new AnimationChainSave { Name = "Run" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.FileName = "test.achx";
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            ctx.SelectedState.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+
+            var frameLen = window.FindControl<NumericUpDown>("PropFrameLen")
+                ?? throw new InvalidOperationException("PropFrameLen not found");
+            frameLen.Value = 0.55m;
+            Dispatcher.UIThread.RunJobs();
+
+            var roots = GetRoots(GetTree(window));
+            Assert.Equal("0.55s", roots[0].Children[0].Meta);
         }
         finally { window.Close(); }
     }

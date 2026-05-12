@@ -88,6 +88,7 @@ public partial class MainWindow : Window
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
 
         Opened += OnOpened;
+        Closed += (_, _) => PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
     }
 
     // ── Startup ───────────────────────────────────────────────────────────────
@@ -152,17 +153,10 @@ public partial class MainWindow : Window
         ZoomCombo.SelectionChanged += OnZoomComboSelectionChanged;
         ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
         ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
-        var unitTypeCombo = this.FindControl<ComboBox>("UnitTypeCombo");
-        if (unitTypeCombo != null)
-        {
-            unitTypeCombo.SelectionChanged += OnUnitTypeComboChanged;
-            unitTypeCombo.SelectedIndex = (int)_appState.UnitType;
-        }
 
         // Apply initial grid state
         WireframeCtrl.SetGrid(false, 16);
-
-        // Sync UnitTypeCombo to current AppState if present in this layout
+        SetUnitType(_appState.UnitType);
     }
 
     private void OnTextureComboChanged(object? sender, SelectionChangedEventArgs e)
@@ -298,15 +292,6 @@ public partial class MainWindow : Window
         return int.TryParse(trimmed, out pct);
     }
 
-    private void OnUnitTypeComboChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ComboBox combo && combo.SelectedIndex >= 0)
-        {
-            _appState.UnitType = (UnitType)combo.SelectedIndex;
-            Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
-        }
-    }
-
     private void OnUnitPixelBtnClick(object? sender, RoutedEventArgs e) =>
         SetUnitType(UnitType.Pixel);
 
@@ -411,6 +396,8 @@ public partial class MainWindow : Window
             _appCommands.SaveCurrentAnimationChainList();
             UpdateTitle();
         }
+
+        Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
     }
 
     private void HandleSelectionChanged()
@@ -421,6 +408,8 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.InvokeAsync(SyncTreeSelection);
         // Refresh property inspector
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
+        // Refresh timeline strip
+        Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
     }
 
     // ── Texture combo helpers ─────────────────────────────────────────────────
@@ -607,6 +596,8 @@ public partial class MainWindow : Window
         ShowGuidesCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowGuides = ShowGuidesCheck.IsChecked == true;
 
+        TimelineStrip.ItemsSource = _timelineFrames;
+
         PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
         PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
         PreviewZoomCombo.LostFocus += OnPreviewZoomComboLostFocus;
@@ -615,6 +606,17 @@ public partial class MainWindow : Window
         PreviewZoomMinusBtn.Click += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, -1, p => PreviewCtrl.SetZoomPercent(p));
 
         PreviewCtrl.ZoomChanged += SyncPreviewZoomCombo;
+        PreviewCtrl.Playback.FrameIndexChanged += OnPreviewPlaybackFrameIndexChanged;
+    }
+
+    private void OnPreviewPlaybackFrameIndexChanged(int index)
+    {
+        if (_selectedState.SelectedFrame is not null)
+            return;
+
+        Dispatcher.UIThread.Post(
+            () => UpdateTimelineScrubber(index),
+            DispatcherPriority.Background);
     }
 
     // ── Editable preview-zoom combo (bottom preview) ─────────────────────────
@@ -686,6 +688,8 @@ public partial class MainWindow : Window
     // ── Tree view ─────────────────────────────────────────────────────────────
 
     private readonly ObservableCollection<TreeNodeVm> _treeRoots = new();
+    private readonly ObservableCollection<TimelineFrameVm> _timelineFrames = new();
+    private int _currentTimelineFrameIndex = -1;
 
     private void WireTreeView()
     {
@@ -714,7 +718,7 @@ public partial class MainWindow : Window
         {
             if (_projectManager.AnimationChainListSave is null)
                 _projectManager.AnimationChainListSave = new AnimationChainListSave();
-            _ = _appCommands.AddAnimationChain();
+            AddAnimationChainAndBeginInlineRename();
         };
 
         // Expand/Collapse toolbar buttons
@@ -741,6 +745,25 @@ public partial class MainWindow : Window
     {
         foreach (var node in _treeRoots)
             node.IsExpanded = expanded;
+    }
+
+    private void AddAnimationChainAndBeginInlineRename()
+    {
+        if (_projectManager.AnimationChainListSave is null)
+            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+
+        var existingNames = _projectManager.AnimationChainListSave.AnimationChains
+            .Select(c => c.Name)
+            .ToList();
+        var defaultName = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
+        var chain = _appCommands.AddAnimationChainWithName(defaultName);
+        if (chain is null) return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            SyncTreeSelection();
+            BeginInlineRenameSelected(chain);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -929,16 +952,18 @@ public partial class MainWindow : Window
     private void RefreshChainNode(AnimationChainSave chain)
     {
         var node = FindChainNode(chain);
+        var rebuiltChainNode = TreeBuilder.BuildChainNode(chain);
         if (node is null)
         {
-            _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
+            _treeRoots.Add(rebuiltChainNode);
         }
         else
         {
-            node.Header = chain.Name;
+            node.Header = rebuiltChainNode.Header;
+            node.Meta = rebuiltChainNode.Meta;
             node.Children.Clear();
-            foreach (var frame in chain.Frames)
-                node.Children.Add(TreeBuilder.BuildFrameNode(frame));
+            for (int i = 0; i < chain.Frames.Count; i++)
+                node.Children.Add(TreeBuilder.BuildFrameNode(chain.Frames[i], i));
         }
     }
 
@@ -947,26 +972,26 @@ public partial class MainWindow : Window
         var chain    = _objectFinder.GetAnimationChainContaining(frame);
         var chainNode = chain is null ? null : FindChainNode(chain);
         if (chainNode is null) return;
+        var frameIndex = chain!.Frames.IndexOf(frame);
 
         var frameNode = chainNode.Children
             .FirstOrDefault(n => n.Data is AnimationFrameSave f && f == frame);
 
+        var rebuiltFrameNode = TreeBuilder.BuildFrameNode(frame, frameIndex);
+
         if (frameNode is null)
         {
-            chainNode.Children.Add(TreeBuilder.BuildFrameNode(frame));
+            chainNode.Children.Add(rebuiltFrameNode);
         }
         else
         {
-            frameNode.Header = TreeBuilder.BuildFrameHeader(frame);
-            // Rebuild shape children via TreeBuilder
+            frameNode.Header = rebuiltFrameNode.Header;
+            frameNode.Kind = rebuiltFrameNode.Kind;
+            frameNode.IsFrameNode = rebuiltFrameNode.IsFrameNode;
+            frameNode.Meta = rebuiltFrameNode.Meta;
             frameNode.Children.Clear();
-            if (frame.ShapesSave is not null)
-            {
-                foreach (var r in frame.ShapesSave.AARectSaves)
-                    frameNode.Children.Add(new TreeNodeVm { Header = r.Name, Data = r });
-                foreach (var c in frame.ShapesSave.CircleSaves)
-                    frameNode.Children.Add(new TreeNodeVm { Header = c.Name, Data = c });
-            }
+            foreach (var child in rebuiltFrameNode.Children)
+                frameNode.Children.Add(child);
         }
     }
 
@@ -986,6 +1011,67 @@ public partial class MainWindow : Window
 
         if (target is not null && !ReferenceEquals(AnimTree.SelectedItem, target))
             AnimTree.SelectedItem = target;
+    }
+
+    private void RefreshTimelineStrip()
+    {
+        var chain = GetTimelineChain();
+
+        _timelineFrames.Clear();
+        foreach (var item in TimelineBuilder.BuildFrameItems(chain))
+            _timelineFrames.Add(item);
+
+        _currentTimelineFrameIndex = -1;
+        UpdateTimelineScrubber(GetPreferredTimelineFrameIndex(chain));
+    }
+
+    private AnimationChainSave? GetTimelineChain()
+    {
+        var chain = _selectedState.SelectedChain;
+        if (chain is null && _selectedState.SelectedFrame is { } selectedFrame)
+            chain = _objectFinder.GetAnimationChainContaining(selectedFrame);
+        return chain;
+    }
+
+    private int GetPreferredTimelineFrameIndex(AnimationChainSave? chain)
+    {
+        if (chain is null || chain.Frames.Count == 0)
+            return -1;
+
+        if (_selectedState.SelectedFrame is { } selectedFrame)
+        {
+            var selectedFrameChain = _objectFinder.GetAnimationChainContaining(selectedFrame);
+            if (ReferenceEquals(selectedFrameChain, chain))
+            {
+                var selectedFrameIndex = chain.Frames.IndexOf(selectedFrame);
+                if (selectedFrameIndex >= 0)
+                    return selectedFrameIndex;
+            }
+        }
+
+        return PreviewCtrl.Playback.CurrentFrameIndex;
+    }
+
+    private void UpdateTimelineScrubber(int frameIndex)
+    {
+        if (_timelineFrames.Count == 0)
+        {
+            _currentTimelineFrameIndex = -1;
+            return;
+        }
+
+        var clampedIndex = Math.Clamp(frameIndex, 0, _timelineFrames.Count - 1);
+        if (_currentTimelineFrameIndex == clampedIndex)
+            return;
+
+        if (_currentTimelineFrameIndex >= 0 &&
+            _currentTimelineFrameIndex < _timelineFrames.Count)
+        {
+            _timelineFrames[_currentTimelineFrameIndex].IsCurrent = false;
+        }
+
+        _timelineFrames[clampedIndex].IsCurrent = true;
+        _currentTimelineFrameIndex = clampedIndex;
     }
 
     // ── Context menu ──────────────────────────────────────────────────────────
@@ -1069,7 +1155,7 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSeparator();
-            AddMenuItem("Rename (texture path)…", () => _ = AskRenameFrameAsync(frame2));
+            AddMenuItem("Rename (texture path)", () => BeginInlineRenameSelected(frame2));
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
@@ -1087,7 +1173,7 @@ public partial class MainWindow : Window
             AddMenuItem("Flip Vertically",    () => _appCommands.FlipChainVertically(chain));
             AddMenuItem("Invert Frame Order", () => _appCommands.InvertFrameOrder(chain));
             AddSeparator();
-            AddMenuItem("Add AnimationChain", () => _ = _appCommands.AddAnimationChain());
+            AddMenuItem("Add AnimationChain", AddAnimationChainAndBeginInlineRename);
             AddMenuItem("Add Frame",          () => _appCommands.AddFrame(chain));
             AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
             AddSeparator();
@@ -1110,7 +1196,7 @@ public partial class MainWindow : Window
             {
                 if (_projectManager.AnimationChainListSave is null)
                     _projectManager.AnimationChainListSave = new AnimationChainListSave();
-                _ = _appCommands.AddAnimationChain();
+                AddAnimationChainAndBeginInlineRename();
             });
         }
 
@@ -1378,13 +1464,14 @@ public partial class MainWindow : Window
             var frame = _selectedState.SelectedFrame;
             var rect  = _selectedState.SelectedRectangle;
             var circ  = _selectedState.SelectedCircle;
+            var hasShapeSelection = rect is not null || circ is not null;
 
             PropNoneLabel.IsVisible   = frame is null && rect is null && circ is null;
-            PropFramePanel.IsVisible  = frame is not null;
+            PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;
 
-            if (frame is not null)
+            if (frame is not null && !hasShapeSelection)
             {
                 PropFlipH.IsChecked  = frame.FlipHorizontal;
                 PropFlipV.IsChecked  = frame.FlipVertical;
@@ -1481,6 +1568,7 @@ public partial class MainWindow : Window
         var frame = _selectedState.SelectedFrame;
         if (frame is null || !PropFrameLen.Value.HasValue) return;
         frame.FrameLength = (float)PropFrameLen.Value.Value;
+        _appCommands.RefreshTreeNode(frame);
         _events.RaiseAnimationChainsChanged();
     }
 
@@ -1836,9 +1924,13 @@ public partial class MainWindow : Window
             {
                 e.Handled = true;
                 if (AnimTree.IsKeyboardFocusWithin &&
-                    AnimTree.SelectedItem is TreeNodeVm vm &&
-                    vm.Data is AnimationChainSave chain)
-                    BeginInlineRename(vm, chain);
+                    AnimTree.SelectedItem is TreeNodeVm vm)
+                {
+                    if (vm.Data is AnimationChainSave chain)
+                        BeginInlineRename(vm, chain.Name);
+                    else if (vm.Data is AnimationFrameSave frame)
+                        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+                }
                 else
                     WireframeCtrl.ToggleDebugMode();
             }
@@ -2313,19 +2405,18 @@ public partial class MainWindow : Window
         if (tvi?.DataContext is not TreeNodeVm vm) return;
         if (vm.Data is not AnimationChainSave chain) return;
         e.Handled = true;
-        BeginInlineRename(vm, chain);
+        BeginInlineRename(vm, chain.Name);
     }
 
     private void OnInlineRenameKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Source is not TextBox tb) return;
         if (tb.DataContext is not TreeNodeVm vm) return;
-        if (vm.Data is not AnimationChainSave chain) return;
 
         if (e.Key == Key.Return)
         {
             e.Handled = true;
-            CommitInlineRename(vm, chain, tb.Text ?? string.Empty);
+            CommitInlineRename(vm, tb.Text ?? string.Empty);
         }
         else if (e.Key == Key.Escape)
         {
@@ -2340,13 +2431,13 @@ public partial class MainWindow : Window
         if (e.Source is not TextBox tb) return;
         if (tb.DataContext is not TreeNodeVm vm) return;
         if (!vm.IsEditing) return;
-        if (vm.Data is not AnimationChainSave chain) return;
-        CommitInlineRename(vm, chain, tb.Text ?? string.Empty);
+        CommitInlineRename(vm, tb.Text ?? string.Empty);
     }
 
-    private void BeginInlineRename(TreeNodeVm vm, AnimationChainSave chain)
+    private void BeginInlineRename(TreeNodeVm vm, string initialText)
     {
-        vm.BeginEdit();
+        vm.EditingText = initialText;
+        vm.IsEditing = true;
         // After the visual tree updates, focus and select-all in the TextBox
         Dispatcher.UIThread.Post(() =>
         {
@@ -2363,15 +2454,39 @@ public partial class MainWindow : Window
     {
         var vm = TreeBuilder.FindNodeForData(_treeRoots, chain);
         if (vm is null) return;
-        BeginInlineRename(vm, chain);
+        BeginInlineRename(vm, chain.Name);
     }
 
-    private void CommitInlineRename(TreeNodeVm vm, AnimationChainSave chain, string newName)
+    private void BeginInlineRenameSelected(AnimationFrameSave frame)
+    {
+        var vm = TreeBuilder.FindNodeForData(_treeRoots, frame);
+        if (vm is null) return;
+        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+    }
+
+    private void CommitInlineRename(TreeNodeVm vm, string newName)
     {
         newName = newName.Trim();
         vm.IsEditing = false;
-        if (!string.IsNullOrEmpty(newName) && newName != chain.Name)
-            _appCommands.RenameChain(chain, newName);
+
+        if (vm.Data is AnimationChainSave chain)
+        {
+            if (!string.IsNullOrEmpty(newName) && newName != chain.Name)
+                _appCommands.RenameChain(chain, newName);
+        }
+        else if (vm.Data is AnimationFrameSave frame)
+        {
+            if (newName != (frame.TextureName ?? string.Empty))
+            {
+                _appCommands.RenameFrame(frame, newName);
+                var frameChain = _objectFinder.GetAnimationChainContaining(frame);
+                if (frameChain is not null) _appCommands.RefreshTreeNode(frameChain);
+                _appCommands.RefreshWireframe();
+                RefreshTextureCombo();
+                _events.RaiseAnimationChainsChanged();
+            }
+        }
+
         AnimTree.Focus();
     }
 

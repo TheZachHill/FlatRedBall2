@@ -6,6 +6,20 @@ namespace AnimationEditor.Core.Tests;
 
 public class TreeNodeVmTests
 {
+    // ── Meta ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Meta_FiresPropertyChanged()
+    {
+        var vm = new TreeNodeVm();
+        string? changed = null;
+        vm.PropertyChanged += (_, e) => changed = e.PropertyName;
+
+        vm.Meta = "0.55s";
+
+        Assert.Equal(nameof(TreeNodeVm.Meta), changed);
+    }
+
     // ── IsEditing ─────────────────────────────────────────────────────────────
 
     [Fact]

@@ -26,27 +26,27 @@ namespace AnimationEditor.App.Controls;
 /// </summary>
 public class PreviewControl : Control
 {
-    // ΓöÇΓöÇ Animation state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;
     private readonly AnimationEditor.Core.CommandsAndState.PlaybackController _playback = new();
 
-    // ΓöÇΓöÇ Bitmap cache ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Bitmap cache ----------------------------------------------------------
     private readonly Dictionary<string, SKBitmap?> _bitmapCache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // ΓöÇΓöÇ Camera ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Camera ----------------------------------------------------------------
     private float _zoom = 1f;
     private float _panX, _panY;
 
-    // ΓöÇΓöÇ Settings ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
     private bool _showGuides;
 
-    // ΓöÇΓöÇ Pan drag ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Pan drag --------------------------------------------------------------
     private bool  _isPanning;
     private Point _lastMousePt;
 
-    // ΓöÇΓöÇ Rulers / guides ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Rulers / guides -------------------------------------------------------
     private const float RulerSize = 20f;
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
@@ -62,7 +62,7 @@ public class PreviewControl : Control
     private float      _shapeDragStartScaleX;  // rect ScaleX or circle Radius at drag start
     private float      _shapeDragStartScaleY;  // rect ScaleY at drag start (0 for circle)
 
-    // ΓöÇΓöÇ Public properties ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Public properties -----------------------------------------------------
 
     public bool ShowOnionSkin
     {
@@ -162,7 +162,7 @@ public class PreviewControl : Control
         return bitmap;
     }
 
-    // ΓöÇΓöÇ Injected services ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Injected services -----------------------------------------------------
 
     private ISelectedState? _selectedState;
     private IAppState? _appState;
@@ -196,7 +196,7 @@ public class PreviewControl : Control
         _appCommands.RefreshAnimationFrameDisplayRequested     += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
     }
 
-    // ΓöÇΓöÇ ConstructorΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Constructor -----------------------------------------------------------
 
     public PreviewControl()
     {
@@ -212,7 +212,7 @@ public class PreviewControl : Control
         _timer.Start();
     }
 
-    // ΓöÇΓöÇ Timer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Timer -----------------------------------------------------------------
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
@@ -221,7 +221,7 @@ public class PreviewControl : Control
         _playback.Advance(0.016);
     }
 
-    // ΓöÇΓöÇ State reset ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- State reset -----------------------------------------------------------
 
     private void OnSelectionChanged()
     {
@@ -229,7 +229,7 @@ public class PreviewControl : Control
         InvalidateVisual();
     }
 
-    // ΓöÇΓöÇ Public API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Public API ------------------------------------------------------------
 
     /// <summary>
     /// Fired after every zoom change. Payload is the new zoom as a percentage
@@ -362,7 +362,7 @@ public class PreviewControl : Control
         InvalidateVisual();
     }
 
-    // ΓöÇΓöÇ Bitmap cache helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Bitmap cache helpers --------------------------------------------------
 
     private SKBitmap? GetBitmap(string? path)
     {
@@ -399,7 +399,7 @@ public class PreviewControl : Control
         return full;
     }
 
-    // ΓöÇΓöÇ Avalonia rendering ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Avalonia rendering ----------------------------------------------------
 
     public override void Render(DrawingContext ctx)
     {
@@ -447,7 +447,7 @@ public class PreviewControl : Control
             _bitmapCache));
     }
 
-    // ΓöÇΓöÇ Guide helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Guide helpers ---------------------------------------------------------
 
     private float GetCenterX(float? width  = null) => ((width  ?? (float)Bounds.Width)  - RulerSize) / 2f + RulerSize + _panX;
     private float GetCenterY(float? height = null) => ((height ?? (float)Bounds.Height) - RulerSize) / 2f + RulerSize + _panY;
@@ -459,7 +459,7 @@ public class PreviewControl : Control
     // Guides snap to the nearest integer (pixel boundary) in world space.
     private static float SnapToPixel(float world) => MathF.Round(world, MidpointRounding.AwayFromZero);
 
-    // ΓöÇΓöÇ Test helpers (internal) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Test helpers (internal) ----------------------------------------------
 
     /// <summary>Horizontal guide world-Y values; exposed for headless tests.</summary>
     internal IReadOnlyList<float> HGuides => _hGuides;
@@ -607,11 +607,11 @@ public class PreviewControl : Control
         return list.ToArray();
     }
 
-    // ΓöÇΓöÇ Pointer events ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Pointer events --------------------------------------------------------
 
     /// <summary>
     /// Removes the first guide within hit distance of (<paramref name="px"/>, <paramref name="py"/>).
-    /// Clicks inside the ruler strips are ignored ΓÇö guides are only visible in the canvas area.
+    /// Clicks inside the ruler strips are ignored - guides are only visible in the canvas area.
     /// Returns <c>true</c> if a guide was removed.
     /// </summary>
     private bool TryRemoveGuideAt(float px, float py)
@@ -1156,7 +1156,7 @@ public class PreviewControl : Control
         Cursor = Cursor.Default;
     }
 
-    // ΓöÇΓöÇ Inner types ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Inner types -----------------------------------------------------------
 
     private enum PreviewShapeKind { Rect, Circle }
 
@@ -1187,7 +1187,7 @@ public class PreviewControl : Control
         bool   DraggingHGuide,
         PreviewShapeInfo[] Shapes);
 
-    // ΓöÇΓöÇ Shared SkiaSharp rendering (used by both live and off-screen paths) ΓöÇΓöÇΓöÇ
+    // -- Shared SkiaSharp rendering (used by both live and off-screen paths) --
 
     private static void RenderSkCore(
         SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKBitmap?> cache)
@@ -1198,7 +1198,7 @@ public class PreviewControl : Control
         float cx = (s.Width  - RulerSize) / 2f + RulerSize + s.PanX;
         float cy = (s.Height - RulerSize) / 2f + RulerSize + s.PanY;
 
-        // ΓöÇΓöÇ Clip content/guide drawing to the non-ruler area ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Clip content/guide drawing to the non-ruler area.
         canvas.Save();
         canvas.ClipRect(new SKRect(RulerSize, RulerSize, s.Width, s.Height));
 
@@ -1256,7 +1256,7 @@ public class PreviewControl : Control
             }
         }
 
-        // ΓöÇΓöÇ Collision shapes (AxisAlignedRectangles and Circles) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Collision shapes (AxisAlignedRectangles and Circles).
         if (s.Shapes.Length > 0)
         {
             float om = s.OffsetMultiplier * s.Zoom;
@@ -1303,7 +1303,7 @@ public class PreviewControl : Control
             }
         }
 
-        // Dragged guide value label ΓÇö drawn last so it stays on top of shapes
+        // Dragged guide value label - drawn last so it stays on top of shapes.
         if (s.DraggedGuideIdx >= 0)
         {
             using var dragLabelFont = new SKFont { Size = 11f };
@@ -1339,7 +1339,7 @@ public class PreviewControl : Control
 
         canvas.Restore(); // end content clip
 
-        // ΓöÇΓöÇ Ruler strips ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        // Ruler strips.
         using var rulerBg = new SKPaint { Color = new SKColor(50, 50, 55) };
         canvas.DrawRect(new SKRect(0,         0, s.Width, RulerSize), rulerBg);   // top
         canvas.DrawRect(new SKRect(0, RulerSize, RulerSize, s.Height), rulerBg);  // left
@@ -1361,7 +1361,7 @@ public class PreviewControl : Control
         float majorStep = GetRulerStep(s.Zoom);
         float minorStep = majorStep / 5f;
 
-        // Top (horizontal) ruler ΓÇö ticks at world-X positions
+        // Top (horizontal) ruler - ticks at world-X positions.
         float wxStart = (RulerSize - cx) / s.Zoom;
         float wxEnd   = (s.Width  - cx) / s.Zoom;
         for (float wx = MathF.Floor(wxStart / minorStep) * minorStep; wx <= wxEnd; wx += minorStep)
@@ -1375,7 +1375,7 @@ public class PreviewControl : Control
                 canvas.DrawText(((int)MathF.Round(wx)).ToString(), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
         }
 
-        // Left (vertical) ruler ΓÇö ticks at world-Y positions
+        // Left (vertical) ruler - ticks at world-Y positions.
         float wyStart = (RulerSize - cy) / s.Zoom;
         float wyEnd   = (s.Height  - cy) / s.Zoom;
         for (float wy = MathF.Floor(wyStart / minorStep) * minorStep; wy <= wyEnd; wy += minorStep)

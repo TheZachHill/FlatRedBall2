@@ -133,9 +133,9 @@ public class UnitTypePropPanelTests
         {
             SetUnitAndRefresh(UnitType.Pixel);
 
-            Assert.True (FindCtrl<StackPanel>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for Pixel");
-            Assert.False(FindCtrl<StackPanel>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for Pixel");
-            Assert.False(FindCtrl<StackPanel>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for Pixel");
+            Assert.True (FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for Pixel");
+            Assert.False(FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for Pixel");
+            Assert.False(FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for Pixel");
         }
         finally { window.Close(); }
     }
@@ -150,9 +150,9 @@ public class UnitTypePropPanelTests
         {
             SetUnitAndRefresh(UnitType.TextureCoordinate);
 
-            Assert.False(FindCtrl<StackPanel>(window, "PropPixelSection").IsVisible, "PropPixelSection should be hidden for TC");
-            Assert.True (FindCtrl<StackPanel>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be visible for TC");
-            Assert.False(FindCtrl<StackPanel>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for TC");
+            Assert.False(FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be hidden for TC");
+            Assert.True (FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be visible for TC");
+            Assert.False(FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for TC");
         }
         finally { window.Close(); }
     }
@@ -188,9 +188,9 @@ public class UnitTypePropPanelTests
         {
             SetUnitAndRefresh(UnitType.SpriteSheet);
 
-            Assert.True (FindCtrl<StackPanel>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for SpriteSheet");
-            Assert.False(FindCtrl<StackPanel>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for SpriteSheet");
-            Assert.True (FindCtrl<StackPanel>(window, "PropTileSection" ).IsVisible, "PropTileSection should be visible for SpriteSheet");
+            Assert.True (FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for SpriteSheet");
+            Assert.False(FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for SpriteSheet");
+            Assert.True (FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be visible for SpriteSheet");
         }
         finally { window.Close(); }
     }
@@ -204,12 +204,12 @@ public class UnitTypePropPanelTests
         try
         {
             SetUnitAndRefresh(UnitType.Pixel);
-            Assert.True(FindCtrl<StackPanel>(window, "PropPixelSection").IsVisible);
-            Assert.False(FindCtrl<StackPanel>(window, "PropTcSection").IsVisible);
+            Assert.True(FindCtrl<Control>(window, "PropPixelSection").IsVisible);
+            Assert.False(FindCtrl<Control>(window, "PropTcSection").IsVisible);
 
             SetUnitAndRefresh(UnitType.TextureCoordinate);
-            Assert.False(FindCtrl<StackPanel>(window, "PropPixelSection").IsVisible);
-            Assert.True(FindCtrl<StackPanel>(window, "PropTcSection").IsVisible);
+            Assert.False(FindCtrl<Control>(window, "PropPixelSection").IsVisible);
+            Assert.True(FindCtrl<Control>(window, "PropTcSection").IsVisible);
         }
         finally { window.Close(); }
     }
@@ -221,10 +221,10 @@ public class UnitTypePropPanelTests
         try
         {
             SetUnitAndRefresh(UnitType.TextureCoordinate);
-            Assert.False(FindCtrl<StackPanel>(window, "PropTileSection").IsVisible);
+            Assert.False(FindCtrl<Control>(window, "PropTileSection").IsVisible);
 
             SetUnitAndRefresh(UnitType.SpriteSheet);
-            Assert.True(FindCtrl<StackPanel>(window, "PropTileSection").IsVisible);
+            Assert.True(FindCtrl<Control>(window, "PropTileSection").IsVisible);
         }
         finally { window.Close(); }
     }
@@ -236,10 +236,10 @@ public class UnitTypePropPanelTests
         try
         {
             SetUnitAndRefresh(UnitType.SpriteSheet);
-            Assert.True(FindCtrl<StackPanel>(window, "PropTileSection").IsVisible);
+            Assert.True(FindCtrl<Control>(window, "PropTileSection").IsVisible);
 
             SetUnitAndRefresh(UnitType.Pixel);
-            Assert.False(FindCtrl<StackPanel>(window, "PropTileSection").IsVisible);
+            Assert.False(FindCtrl<Control>(window, "PropTileSection").IsVisible);
         }
         finally { window.Close(); }
     }
@@ -283,7 +283,7 @@ public class UnitTypePropPanelTests
         try
         {
             var spriteSheetBtn = FindCtrl<ToggleButton>(window, "UnitSpriteSheetBtn");
-            var tilePanel      = FindCtrl<StackPanel>(window, "PropTileSection");
+            var tilePanel      = FindCtrl<Control>(window, "PropTileSection");
 
             spriteSheetBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
                 Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
@@ -291,6 +291,66 @@ public class UnitTypePropPanelTests
 
             Assert.True(tilePanel.IsVisible,
                 "PropTileSection must be visible when UnitSpriteSheetBtn is clicked with a frame selected");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RectangleSelection_ShowsOnlyRectangleInspector()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+        var rect = new AARectSave { Name = "HitBox", X = 3, Y = 4, ScaleX = 8, ScaleY = 9 };
+        frame.ShapesSave!.AARectSaves.Add(rect);
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+
+        try
+        {
+            ctx.SelectedState.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+            ctx.SelectedState.SelectedRectangle = rect;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(FindCtrl<StackPanel>(window, "PropFramePanel").IsVisible);
+            Assert.True(FindCtrl<StackPanel>(window, "PropRectPanel").IsVisible);
+            Assert.False(FindCtrl<StackPanel>(window, "PropCirclePanel").IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CircleSelection_ShowsOnlyCircleInspector()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+        var circle = new CircleSave { Name = "HurtCircle", X = 6, Y = 2, Radius = 7 };
+        frame.ShapesSave!.CircleSaves.Add(circle);
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+
+        try
+        {
+            ctx.SelectedState.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+            ctx.SelectedState.SelectedCircle = circle;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(FindCtrl<StackPanel>(window, "PropFramePanel").IsVisible);
+            Assert.False(FindCtrl<StackPanel>(window, "PropRectPanel").IsVisible);
+            Assert.True(FindCtrl<StackPanel>(window, "PropCirclePanel").IsVisible);
         }
         finally { window.Close(); }
     }

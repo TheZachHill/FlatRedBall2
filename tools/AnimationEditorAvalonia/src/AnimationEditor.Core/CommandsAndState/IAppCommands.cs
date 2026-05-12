@@ -47,6 +47,7 @@ namespace AnimationEditor.Core.CommandsAndState
         Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains);
         Task AskToDeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
+        AnimationChainSave? AddAnimationChainWithName(string name);
         bool RenameChain(AnimationChainSave chain, string newName);
         void RenameFrame(AnimationFrameSave frame, string newTextureName);
         void AddFrame(AnimationChainSave chain, string? textureName = null);

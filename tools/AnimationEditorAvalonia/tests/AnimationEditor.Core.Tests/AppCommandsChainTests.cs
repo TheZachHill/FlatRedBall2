@@ -98,6 +98,21 @@ public class AppCommandsChainTests
         Assert.Empty(acls.AnimationChains);
     }
 
+    [Fact]
+    public void AddAnimationChainWithName_AddsNamedChainWithoutPrompt()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.PromptStringAsync = (_, _, _) => throw new InvalidOperationException("Prompt should not be called.");
+
+        var chain = ctx.AppCommands.AddAnimationChainWithName("WalkRight");
+
+        Assert.NotNull(chain);
+        Assert.Equal("WalkRight", chain!.Name);
+        Assert.Single(acls.AnimationChains);
+        Assert.Same(chain, ctx.SelectedState.SelectedChain);
+    }
+
     // ── MoveChain ────────────────────────────────────────────────────────────
 
     [Fact]

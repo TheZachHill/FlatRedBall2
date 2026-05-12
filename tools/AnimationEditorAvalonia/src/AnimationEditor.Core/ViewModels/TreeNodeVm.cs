@@ -71,8 +71,13 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// </summary>
     public bool IsChainNode { get; set; }
 
+    private string _meta = string.Empty;
     /// <summary>Short metadata string displayed beside the node header (e.g. frame count or duration).</summary>
-    public string Meta { get; set; } = string.Empty;
+    public string Meta
+    {
+        get => _meta;
+        set { if (_meta != value) { _meta = value; Notify(); } }
+    }
 
     /// <summary>Discriminator for the icon shown in the tree item template.</summary>
     public NodeKind Kind { get; set; } = NodeKind.Frame;
