@@ -41,11 +41,11 @@
                     <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                 </MenuItem>
                 <MenuItem Header="_View">
-                    <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+=" />
-                    <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+-" />
+                    <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+OemPlus" />
+                    <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+OemMinus" />
                     <Separator />
-                    <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+=" />
-                    <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+-" />
+                    <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+OemPlus" />
+                    <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+OemMinus" />
                 </MenuItem>
                 <MenuItem Header="_Help">
                     <MenuItem Header="_About"         x:Name="MenuAbout" />
