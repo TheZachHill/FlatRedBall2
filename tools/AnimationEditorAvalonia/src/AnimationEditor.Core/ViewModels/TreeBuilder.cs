@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.ViewModels;
 
@@ -43,49 +42,34 @@ public static class TreeBuilder
     /// <summary>Builds a single chain node with all its frame children.</summary>
     public static TreeNodeVm BuildChainNode(AnimationChainSave chain)
     {
-        var node = new TreeNodeVm
-        {
-            Header = chain.Name,
-            Data = chain,
-            IsExpanded = true,
-            IsChainNode = true,
-            Kind = NodeKind.Chain,
-            Meta = $"{chain.Frames.Count} fr",
-        };
-        for (int i = 0; i < chain.Frames.Count; i++)
-            node.Children.Add(BuildFrameNode(chain.Frames[i], i));
+        var node = new TreeNodeVm { Header = chain.Name, Data = chain, IsExpanded = true, IsChainNode = true };
+        foreach (var frame in chain.Frames)
+            node.Children.Add(BuildFrameNode(frame));
         return node;
     }
 
     /// <summary>
     /// Builds a single frame node with any shape children from
-    /// <see cref="AnimationFrameSave.ShapeCollectionSave"/>.
+    /// <see cref="AnimationFrameSave.ShapesSave"/>.
     /// </summary>
-    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
+    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame)
     {
-        var node = new TreeNodeVm
+        var node = new TreeNodeVm { Header = BuildFrameHeader(frame), Data = frame };
+        if (frame.ShapesSave is not null)
         {
-            Header = BuildFrameHeader(frame, index),
-            Data = frame,
-            Kind = NodeKind.Frame,
-            IsFrameNode = true,
-            Meta = $"{frame.FrameLength:0.00}s",
-        };
-        if (frame.ShapeCollectionSave is not null)
-        {
-            foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
-                node.Children.Add(new TreeNodeVm { Header = r.Name, Data = r, Kind = NodeKind.RectShape, IsRectNode = true });
-            foreach (var c in frame.ShapeCollectionSave.CircleSaves)
-                node.Children.Add(new TreeNodeVm { Header = c.Name, Data = c, Kind = NodeKind.CircleShape, IsCircleNode = true });
+            foreach (var r in frame.ShapesSave!.AARectSaves)
+                node.Children.Add(new TreeNodeVm { Header = r.Name, Data = r });
+            foreach (var c in frame.ShapesSave!.CircleSaves)
+                node.Children.Add(new TreeNodeVm { Header = c.Name, Data = c });
         }
         return node;
     }
 
     /// <summary>Returns the display label for a frame node.</summary>
-    public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
+    public static string BuildFrameHeader(AnimationFrameSave frame)
     {
         if (string.IsNullOrEmpty(frame.TextureName))
-            return $"Frame {index}";
+            return "<UNTEXTURED>";
         return Path.GetFileName(frame.TextureName);
     }
 
@@ -113,8 +97,9 @@ public static class TreeBuilder
     /// nodes from overwriting live selection state.
     /// </para>
     /// </summary>
-    public static bool RouteNodeSelection(object data, ISelectedState selectedState, AnimationChainListSave acls)
+    public static bool RouteNodeSelection(object? data, ISelectedState selectedState, AnimationChainListSave? acls)
     {
+        if (data is null) return false;
         switch (data)
         {
             case AnimationChainSave chain:
@@ -135,7 +120,7 @@ public static class TreeBuilder
                     selectedState.SelectedFrame = frame;
                 return true;
             }
-            case AxisAlignedRectangleSave rect:
+            case AARectSave rect:
             {
                 var parentFrame = FindParentFrameFor(rect, acls);
                 if (parentFrame is null) return true; // stale — shape not reachable from live project
@@ -162,7 +147,7 @@ public static class TreeBuilder
 
     /// <summary>
     /// Searches the full animation chain list for the <see cref="AnimationFrameSave"/>
-    /// that owns <paramref name="shape"/> via its <c>ShapeCollectionSave</c>.
+    /// that owns <paramref name="shape"/> via its <c>ShapesSave</c>.
     /// Returns <c>null</c> when the shape cannot be found (e.g. stale node after a test reset).
     /// </summary>
     private static AnimationFrameSave? FindParentFrameFor(object shape, AnimationChainListSave? acls)
@@ -170,9 +155,9 @@ public static class TreeBuilder
         if (acls is null) return null;
         foreach (var chain in acls.AnimationChains)
             foreach (var frame in chain.Frames)
-                if (frame.ShapeCollectionSave is { } scs)
+                if (frame.ShapesSave is { } scs)
                     if ((shape is CircleSave c && scs.CircleSaves.Contains(c)) ||
-                        (shape is AxisAlignedRectangleSave r && scs.AxisAlignedRectangleSaves.Contains(r)))
+                        (shape is AARectSave r && scs.AARectSaves.Contains(r)))
                         return frame;
         return null;
     }
