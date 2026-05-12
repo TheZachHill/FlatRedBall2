@@ -562,6 +562,7 @@ public partial class MainWindow : Window
         _projectManager.AnimationChainListSave =
             new AnimationChainListSave();
         _projectManager.FileName = null;
+        RefreshTreeView();
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
     }
 
