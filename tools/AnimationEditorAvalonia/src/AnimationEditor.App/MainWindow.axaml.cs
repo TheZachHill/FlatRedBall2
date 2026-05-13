@@ -1206,11 +1206,18 @@ public partial class MainWindow : Window
         }
         else if (vm?.Data is AnimationChainSave chain)
         {
-            AddMenuItem("^^ Move To Top",    () => _appCommands.MoveChainToTop(chain));
-            AddMenuItem("^  Move Up",         () => _appCommands.MoveChain(chain, -1));
-            AddMenuItem("v  Move Down",        () => _appCommands.MoveChain(chain, +1));
-            AddMenuItem("vv Move To Bottom",  () => _appCommands.MoveChainToBottom(chain));
-            AddSeparator();
+            var chains = _projectManager.AnimationChainListSave?.AnimationChains;
+            if (chains is not null && chains.Count > 1)
+            {
+                var chainIndex = chains.IndexOf(chain);
+                var isFirst    = chainIndex == 0;
+                var isLast     = chainIndex == chains.Count - 1;
+                if (!isFirst) AddMenuItem("^^ Move To Top",   () => _appCommands.MoveChainToTop(chain));
+                if (!isFirst) AddMenuItem("^  Move Up",        () => _appCommands.MoveChain(chain, -1));
+                if (!isLast)  AddMenuItem("v  Move Down",      () => _appCommands.MoveChain(chain, +1));
+                if (!isLast)  AddMenuItem("vv Move To Bottom", () => _appCommands.MoveChainToBottom(chain));
+                AddSeparator();
+            }
             AddMenuItem("Adjust Frame Time…", () => AskAdjustFrameTime(chain));
             AddMenuItem("Flip Horizontally",  () => _appCommands.FlipChainHorizontally(chain));
             AddMenuItem("Flip Vertically",    () => _appCommands.FlipChainVertically(chain));

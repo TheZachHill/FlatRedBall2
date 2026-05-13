@@ -266,8 +266,13 @@ public class HeadlessTreeViewTests
             var tree  = GetTree(window);
             var roots = GetRoots(tree);
 
-            var chain = new AnimationChainSave { Name = "Idle" };
-            var vm    = new TreeNodeVm { Header = "Idle", Data = chain };
+            // Three chains so the middle one has all four move items available.
+            var chain0 = new AnimationChainSave { Name = "Idle" };
+            var chain1 = new AnimationChainSave { Name = "Walk" };
+            var chain2 = new AnimationChainSave { Name = "Run"  };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.AddRange([chain0, chain1, chain2]);
+
+            var vm = new TreeNodeVm { Header = "Walk", Data = chain1 };
             roots.Add(vm);
             tree.SelectedItem = vm;
 
@@ -278,6 +283,91 @@ public class HeadlessTreeViewTests
             Assert.Contains("Flip Vertically",   headers);
             Assert.Contains("^  Move Up",         headers);
             Assert.Contains("v  Move Down",        headers);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ContextMenu_Chain_SingleChainList_HidesAllMoveItems()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tree  = GetTree(window);
+            var roots = GetRoots(tree);
+
+            var chain = new AnimationChainSave { Name = "Idle" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            var vm = new TreeNodeVm { Header = "Idle", Data = chain };
+            roots.Add(vm);
+            tree.SelectedItem = vm;
+
+            TriggerContextMenuOpening(window);
+
+            var headers = ContextMenuHeaders(window);
+            Assert.DoesNotContain("^^ Move To Top",   headers);
+            Assert.DoesNotContain("^  Move Up",        headers);
+            Assert.DoesNotContain("v  Move Down",      headers);
+            Assert.DoesNotContain("vv Move To Bottom", headers);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ContextMenu_Chain_FirstChainInList_HidesUpAndTopItems()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tree  = GetTree(window);
+            var roots = GetRoots(tree);
+
+            var chain0 = new AnimationChainSave { Name = "Idle" };
+            var chain1 = new AnimationChainSave { Name = "Walk" };
+            var chain2 = new AnimationChainSave { Name = "Run"  };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.AddRange([chain0, chain1, chain2]);
+
+            var vm = new TreeNodeVm { Header = "Idle", Data = chain0 };
+            roots.Add(vm);
+            tree.SelectedItem = vm;
+
+            TriggerContextMenuOpening(window);
+
+            var headers = ContextMenuHeaders(window);
+            Assert.DoesNotContain("^^ Move To Top",   headers);
+            Assert.DoesNotContain("^  Move Up",        headers);
+            Assert.Contains("v  Move Down",            headers);
+            Assert.Contains("vv Move To Bottom",       headers);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ContextMenu_Chain_LastChainInList_HidesDownAndBottomItems()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tree  = GetTree(window);
+            var roots = GetRoots(tree);
+
+            var chain0 = new AnimationChainSave { Name = "Idle" };
+            var chain1 = new AnimationChainSave { Name = "Walk" };
+            var chain2 = new AnimationChainSave { Name = "Run"  };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.AddRange([chain0, chain1, chain2]);
+
+            var vm = new TreeNodeVm { Header = "Run", Data = chain2 };
+            roots.Add(vm);
+            tree.SelectedItem = vm;
+
+            TriggerContextMenuOpening(window);
+
+            var headers = ContextMenuHeaders(window);
+            Assert.Contains("^^ Move To Top",          headers);
+            Assert.Contains("^  Move Up",              headers);
+            Assert.DoesNotContain("v  Move Down",      headers);
+            Assert.DoesNotContain("vv Move To Bottom", headers);
         }
         finally { window.Close(); }
     }
