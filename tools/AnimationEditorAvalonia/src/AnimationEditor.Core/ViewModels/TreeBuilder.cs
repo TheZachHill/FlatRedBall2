@@ -104,13 +104,18 @@ public static class TreeBuilder
         return node;
     }
 
-    /// <summary>Returns the display label for a frame node.</summary>
+    /// <summary>
+    /// Returns the display label for a frame node.
+    /// Priority: explicit <see cref="AnimationFrameSave.Name"/> (user-assigned) >
+    /// <see cref="Path.GetFileName"/> of <see cref="AnimationFrameSave.TextureName"/> >
+    /// position-based fallback "Frame N".
+    /// </summary>
     public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
     {
-        if (!string.IsNullOrEmpty(frame.TextureName))
-            return Path.GetFileName(frame.TextureName);
         if (!string.IsNullOrEmpty(frame.Name))
             return frame.Name;
+        if (!string.IsNullOrEmpty(frame.TextureName))
+            return Path.GetFileName(frame.TextureName);
         return $"Frame {index + 1}";
     }
 

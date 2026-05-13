@@ -2486,8 +2486,8 @@ public partial class MainWindow : Window
 
         if (vm.Data is AnimationChainSave chain)
             BeginInlineRename(vm, chain.Name);
-        else if (vm.Data is AnimationFrameSave frame)
-            BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+        else if (vm.Data is AnimationFrameSave)
+            BeginInlineRename(vm, vm.Header);
     }
 
     /// <summary>
@@ -2582,7 +2582,7 @@ public partial class MainWindow : Window
     {
         var vm = TreeBuilder.FindNodeForData(_treeRoots, frame);
         if (vm is null) return;
-        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+        BeginInlineRename(vm, vm.Header);
     }
 
     private void CommitInlineRename(TreeNodeVm vm, string newName)
@@ -2597,14 +2597,13 @@ public partial class MainWindow : Window
         }
         else if (vm.Data is AnimationFrameSave frame)
         {
-            if (newName != (frame.TextureName ?? string.Empty))
+            // Rename updates frame.Name (the display label) — never frame.TextureName,
+            // which holds the actual texture path and must not be cleared.
+            if (newName != frame.Name)
             {
-                _appCommands.RenameFrame(frame, newName);
-                var frameChain = _objectFinder.GetAnimationChainContaining(frame);
-                if (frameChain is not null) _appCommands.RefreshTreeNode(frameChain);
-                _appCommands.RefreshWireframe();
-                RefreshTextureCombo();
-                _events.RaiseAnimationChainsChanged();
+                frame.Name = newName;
+                _appCommands.RefreshTreeNode(frame);
+                _appCommands.SaveCurrentAnimationChainList();
             }
         }
 

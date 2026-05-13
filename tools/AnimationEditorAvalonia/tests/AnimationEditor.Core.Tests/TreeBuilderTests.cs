@@ -152,6 +152,20 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
+    public void BuildFrameHeader_NameOverridesTextureFilename()
+    {
+        // A user-assigned Name takes precedence over the texture filename so that
+        // double-click rename on a textured frame changes the display label without
+        // touching the texture reference.
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "sprites/walk1.png",
+            Name = "Walk Start",
+        };
+        Assert.Equal("Walk Start", TreeBuilder.BuildFrameHeader(frame));
+    }
+
+    [Fact]
     public void BuildFrameNode_WithShapes_AddsShapeChildren()
     {
         var frame = new AnimationFrameSave
