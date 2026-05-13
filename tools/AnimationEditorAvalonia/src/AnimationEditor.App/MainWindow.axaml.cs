@@ -1533,7 +1533,14 @@ public partial class MainWindow : Window
             var circ  = _selectedState.SelectedCircle;
             var hasShapeSelection = rect is not null || circ is not null;
 
-            PropNoneLabel.IsVisible   = frame is null && rect is null && circ is null;
+            bool noneVisible = frame is null && rect is null && circ is null;
+            PropNoneLabel.IsVisible = noneVisible;
+            if (noneVisible)
+            {
+                PropNoneLabel.Text = _selectedState.SelectedChain is not null
+                    ? "Select a frame or shape to edit its properties."
+                    : "No selection";
+            }
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;

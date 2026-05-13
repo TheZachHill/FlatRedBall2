@@ -123,6 +123,40 @@ public class UnitTypePropPanelTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public void PropNoneLabel_WhenChainSelected_ShowsContextHint()
+    {
+        var window = CreateWindowWithFrame(out _);
+        try
+        {
+            // Directly set a chain with no frame — SelectedChain setter clears frame/rect/circ
+            ctx.SelectedState.SelectedChain = new AnimationChainSave { Name = "Walk" };
+            Dispatcher.UIThread.RunJobs();
+
+            var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
+            Assert.True(label.IsVisible);
+            Assert.Equal("Select a frame or shape to edit its properties.", label.Text);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void PropNoneLabel_WhenNothingSelected_ShowsNoSelection()
+    {
+        var window = CreateWindowWithFrame(out _);
+        try
+        {
+            // Reset clears chain + frame + shapes and fires SelectionChanged
+            ctx.SelectedState.Reset();
+            Dispatcher.UIThread.RunJobs();
+
+            var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
+            Assert.True(label.IsVisible);
+            Assert.Equal("No selection", label.Text);
+        }
+        finally { window.Close(); }
+    }
+
     // ── Pixel mode ────────────────────────────────────────────────────────────
 
     [AvaloniaFact]
