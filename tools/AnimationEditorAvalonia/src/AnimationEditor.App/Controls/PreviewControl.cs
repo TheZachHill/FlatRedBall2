@@ -1403,9 +1403,8 @@ public class PreviewControl : Control
         {
             float sx = cx + wx * s.Zoom;
             if (sx < RulerSize || sx > s.Width) continue;
-            bool isMajor = MathF.Abs(wx % majorStep) < minorStep * 0.4f;
+            bool isMajor = IsMajorTick(wx, majorStep, minorStep);
             float tickH = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
-            canvas.DrawLine(sx, RulerSize - tickH, sx, RulerSize, tickPaint);
             if (isMajor)
                 canvas.DrawText(FormatRulerLabel(majorStep, wx), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
         }
@@ -1417,7 +1416,7 @@ public class PreviewControl : Control
         {
             float sy = cy + wy * s.Zoom;
             if (sy < RulerSize || sy > s.Height) continue;
-            bool isMajor = MathF.Abs(wy % majorStep) < minorStep * 0.4f;
+            bool isMajor = IsMajorTick(wy, majorStep, minorStep);
             float tickW = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
             canvas.DrawLine(RulerSize - tickW, sy, RulerSize, sy, tickPaint);
             if (isMajor)
@@ -1454,6 +1453,14 @@ public class PreviewControl : Control
         using var borderPaint = new SKPaint { Color = new SKColor(80, 80, 85), StrokeWidth = 1f };
         canvas.DrawLine(RulerSize, 0, RulerSize, s.Height, borderPaint);
         canvas.DrawLine(0, RulerSize, s.Width, RulerSize, borderPaint);
+    }
+
+    internal static bool IsMajorTick(float value, float majorStep, float minorStep)
+    {
+        // Use nearest-multiple distance instead of % to correctly handle negative values.
+        // C# % truncates toward zero, so e.g. -3.9999998 % 2 ≈ -2 (not ≈ 0).
+        float distToNearest = value - MathF.Round(value / majorStep) * majorStep;
+        return MathF.Abs(distToNearest) < minorStep * 0.4f;
     }
 
     internal static float GetRulerStep(float zoom)

@@ -4,11 +4,44 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Tests for ruler step selection and label formatting at all zoom levels,
-/// including high zoom (2000%+) where sub-pixel steps are needed.
+/// Tests for ruler step selection, major-tick detection, and label formatting at all zoom
+/// levels, including high zoom (2000%+) and negative world coordinates.
 /// </summary>
 public class RulerStepTests
 {
+    // ── IsMajorTick ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsMajorTick_PositiveExactMultiple_IsTrue()
+    {
+        // majorStep=2, minorStep=0.4 — positive multiples of 2 must be major
+        Assert.True(PreviewControl.IsMajorTick(4f, majorStep: 2f, minorStep: 0.4f));
+    }
+
+    [Fact]
+    public void IsMajorTick_NegativeExactMultiple_IsTrue()
+    {
+        // -4 is on the 2-unit grid — must be major (fails with wx % step)
+        Assert.True(PreviewControl.IsMajorTick(-4f, majorStep: 2f, minorStep: 0.4f));
+    }
+
+    [Fact]
+    public void IsMajorTick_NegativeNearMiss_IsFalse()
+    {
+        // -3.6 is NOT on the 2-unit grid
+        Assert.False(PreviewControl.IsMajorTick(-3.6f, majorStep: 2f, minorStep: 0.4f));
+    }
+
+    [Fact]
+    public void IsMajorTick_NegativeWithFloatDrift_IsTrue()
+    {
+        // Simulate the float-accumulation scenario: wx slightly below -4
+        // (the bug scenario — wx % 2 gives ≈ -2, not ≈ 0)
+        Assert.True(PreviewControl.IsMajorTick(-4f + 1e-5f, majorStep: 2f, minorStep: 0.4f));
+        Assert.True(PreviewControl.IsMajorTick(-4f - 1e-5f, majorStep: 2f, minorStep: 0.4f));
+    }
+
+
     // ── GetRulerStep – normal zoom ────────────────────────────────────────────
 
     [Fact]
