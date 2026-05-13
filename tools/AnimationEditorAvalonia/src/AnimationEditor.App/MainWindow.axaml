@@ -234,6 +234,33 @@
                             <Setter Property="IsExpanded"
                                     Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
                         </Style>
+                        <!-- Expand chevron hit area to a full-height square; icon stays 12×12 centered. -->
+                        <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
+                        </Style>
+                        <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
+                            <Setter Property="VerticalAlignment" Value="Stretch" />
+                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                            <Setter Property="Width" Value="NaN" />
+                            <Setter Property="Height" Value="NaN" />
+                            <Setter Property="Template">
+                                <ControlTemplate>
+                                    <Border Background="Transparent">
+                                        <Path x:Name="ChevronPath"
+                                              Width="12" Height="12"
+                                              Data="{StaticResource TreeViewItemCollapsedChevronPathData}"
+                                              Fill="{DynamicResource TreeViewItemForeground}"
+                                              Stretch="Uniform"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter>
+                        </Style>
+                        <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:checked /template/ Path#ChevronPath">
+                            <Setter Property="Data" Value="{StaticResource TreeViewItemExpandedChevronPathData}" />
+                        </Style>
                         <!-- Inline "Add Frame" button: hidden by default, revealed on row hover -->
                         <Style Selector="Button.add-frame-btn">
                             <Setter Property="Opacity" Value="0" />
@@ -282,7 +309,8 @@
                                                    Foreground="{StaticResource Ink}"
                                                    Padding="2,1"
                                                    VerticalAlignment="Center"
-                                                   IsVisible="{Binding !IsEditing}" />
+                                                   IsVisible="{Binding !IsEditing}"
+                                                   DoubleTapped="OnHeaderTextDoubleTapped" />
                                         <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
                                         <TextBox Text="{Binding EditingText, Mode=TwoWay}"
                                                  IsVisible="{Binding IsEditing}"
@@ -381,11 +409,12 @@
                         <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
                                 Margin="4,0" VerticalAlignment="Center" />
 
-                        <CheckBox x:Name="SnapToGridCheck"
-                                  Foreground="{StaticResource Ink}"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,4,0"
-                                  ToolTip.Tip="Snap to Grid">
+                        <ToggleButton x:Name="SnapToGridCheck"
+                                      Height="26"
+                                      Foreground="{StaticResource Ink}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,4,0"
+                                      ToolTip.Tip="Snap to Grid">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <svg:Svg Width="16" Height="16"
                                          Path="avares://AnimationEditor.App/Assets/icons/svg/IconGrid.svg"
@@ -393,7 +422,7 @@
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="Grid" VerticalAlignment="Center" />
                             </StackPanel>
-                        </CheckBox>
+                        </ToggleButton>
 
                         <Border BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"

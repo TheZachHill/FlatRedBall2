@@ -8,6 +8,7 @@ using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -838,6 +839,45 @@ public class HeadlessTreeViewTests
     }
 
     [AvaloniaFact]
+    public void MoveFrame_PreservesFrameVmIdentityAndSelection()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain  = new AnimationChainSave { Name = "Walk" };
+            var frameA = new AnimationFrameSave { TextureName = "a.png" };
+            var frameB = new AnimationFrameSave { TextureName = "b.png" };
+            chain.Frames.Add(frameA);
+            chain.Frames.Add(frameB);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree      = GetTree(window);
+            var chainNode = GetRoots(tree)[0];
+            var frameAVm  = chainNode.Children[0];
+            Assert.Same(frameA, frameAVm.Data);
+
+            // Select frameA in the tree and mark it expanded
+            tree.SelectedItems!.Add(frameAVm);
+            frameAVm.IsExpanded = true;
+
+            // Move frameA down one position
+            ctx.AppCommands.MoveFrame(frameA, chain, +1);
+            Dispatcher.UIThread.RunJobs();
+
+            // Same VM instance should now be at index 1
+            Assert.Same(frameAVm, chainNode.Children[1]);
+            // Avalonia selection must survive (relies on object identity)
+            Assert.Contains(frameAVm, tree.SelectedItems.Cast<TreeNodeVm>());
+            // Expanded state must be preserved
+            Assert.True(frameAVm.IsExpanded);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void PropFrameLen_ValueChanged_UpdatesFrameMetaImmediately()
     {
         var (window, ctx) = CreateWindow();
@@ -869,5 +909,121 @@ public class HeadlessTreeViewTests
             Assert.Equal("0.55s", roots[0].Children[0].Meta);
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RenameChain_DoesNotCollapseChainNode()
+    {
+        // Regression: double-click rename was collapsing the chain node because
+        // OnAnimTreeDoubleTapped toggled IsExpanded even when the TextBlock's
+        // DoubleTapped handler had already handled the event.
+        // This test verifies that the rename flow (AppCommands.RenameChain →
+        // RefreshChainNode) leaves IsExpanded untouched.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var chainNode = GetRoots(GetTree(window))[0];
+            chainNode.IsExpanded = true;
+
+            ctx.AppCommands.RenameChain(chain, "Walk Renamed");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(chainNode.IsExpanded, "Chain node must stay expanded after inline rename.");
+            Assert.Equal("Walk Renamed", chainNode.Header);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RenameFrameLabel_DoesNotCollapseParentChainNode()
+    {
+        // Regression: after committing a frame inline rename the parent chain was
+        // collapsing. This test verifies that setting frame.Name + RefreshTreeNode
+        // (the CommitInlineRename path for frames) leaves the parent IsExpanded intact.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { TextureName = "a.png" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var chainNode = GetRoots(GetTree(window))[0];
+            chainNode.IsExpanded = true;
+
+            // Simulate CommitInlineRename for a frame: set Name + RefreshTreeNode
+            frame.Name = "My Frame";
+            ctx.AppCommands.RefreshTreeNode(frame);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(chainNode.IsExpanded, "Parent chain node must stay expanded after frame label rename.");
+            Assert.Equal("My Frame", chainNode.Children[0].Header);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void PressEnterToConfirmRename_DoesNotCollapseChainNode()
+    {
+            // Regression: Avalonia 12.x TreeViewItem.OnKeyDown handles Key.Enter by toggling
+            // IsExpanded. With a Bubble-only subscription on AnimTree, the TreeViewItem processes
+            // Enter before our handler runs, collapsing the chain mid-rename.
+            // Fix: use RoutingStrategies.Tunnel so our handler intercepts Enter at the TreeView
+            // level (going DOWN) before the event ever reaches TreeViewItem.OnKeyDown.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var chain = new AnimationChainSave { Name = "Walk" };
+                ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+                TriggerRefreshTreeView(window);
+                Dispatcher.UIThread.RunJobs();
+
+                var tree = GetTree(window);
+                var chainNode = GetRoots(tree)[0];
+                chainNode.IsExpanded = true;
+                Dispatcher.UIThread.RunJobs();
+
+                // Start inline rename
+                var beginMethod = typeof(MainWindow).GetMethod(
+                    "BeginInlineRenameSelected",
+                    BindingFlags.NonPublic | BindingFlags.Instance,
+                    null,
+                    [typeof(AnimationChainSave)],
+                    null)
+                    ?? throw new InvalidOperationException("BeginInlineRenameSelected not found");
+                beginMethod.Invoke(window, [chain]);
+                Dispatcher.UIThread.RunJobs(); // flushes the Post(DispatcherPriority.Render) callback
+
+                // Locate the TextBox that BeginInlineRename activated
+                var tb = tree.GetVisualDescendants()
+                    .OfType<TextBox>()
+                    .FirstOrDefault(t => t.DataContext == chainNode);
+                Assert.NotNull(tb);
+
+                // Raise Key.Return — the Tunnel handler on AnimTree must intercept it
+                // before TreeViewItem.OnKeyDown toggles IsExpanded.
+                tb.RaiseEvent(new KeyEventArgs
+                {
+                    RoutedEvent = InputElement.KeyDownEvent,
+                    Source = tb,
+                    Key = Key.Return,
+                });
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.True(chainNode.IsExpanded,
+                    "Pressing Enter to confirm rename must not collapse the chain node.");
+            }
+            finally { window.Close(); }
     }
 }

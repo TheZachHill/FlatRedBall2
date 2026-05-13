@@ -756,14 +756,17 @@ public partial class MainWindow : Window
         ExpandAllBtn.Click  += (_, _) => SetAllExpanded(true);
         CollapseAllBtn.Click += (_, _) => SetAllExpanded(false);
 
-        // Inline rename: double-tap a chain node
+        // Blank-space double-tap: expand / collapse the node
         AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
 
-        // Bubble-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel)
+        // Tunnel-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel).
+        // Must be Tunnel (not Bubble) so we intercept Enter/Escape BEFORE the event
+        // reaches TreeViewItem.OnKeyDown, which in Avalonia 12.x handles Key.Enter by
+        // toggling IsExpanded — collapsing the chain mid-rename if we arrive too late.
         AnimTree.AddHandler(
             InputElement.KeyDownEvent,
             OnInlineRenameKeyDown,
-            RoutingStrategies.Bubble);
+            RoutingStrategies.Tunnel);
 
         // Bubble-phase LostFocus from the inline TextBox: commit
         AnimTree.AddHandler(
@@ -992,15 +995,14 @@ public partial class MainWindow : Window
     private void RefreshChainNode(AnimationChainSave chain)
     {
         var node = FindChainNode(chain);
-        var rebuiltChainNode = TreeBuilder.BuildChainNode(chain);
         if (node is null)
         {
-            _treeRoots.Add(rebuiltChainNode);
+            _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
         }
         else
         {
-            node.Header = rebuiltChainNode.Header;
-            node.Meta   = rebuiltChainNode.Meta;
+            node.Header = chain.Name;
+            node.Meta   = $"{chain.Frames.Count} fr";
             TreeBuilder.SyncFramesInto(node, chain.Frames);
         }
     }
@@ -2474,8 +2476,35 @@ public partial class MainWindow : Window
 
     // ── Inline rename helpers ─────────────────────────────────────────────────
 
+    /// <summary>
+    /// Double-tap on the text label of a tree node → inline rename.
+    /// Marks the event handled so it does not bubble to <see cref="OnAnimTreeDoubleTapped"/>.
+    /// </summary>
+    private void OnHeaderTextDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Control src) return;
+        var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        if (tvi?.DataContext is not TreeNodeVm vm) return;
+        e.Handled = true;
+
+        if (vm.Data is AnimationChainSave chain)
+            BeginInlineRename(vm, chain.Name);
+        else if (vm.Data is AnimationFrameSave)
+            BeginInlineRename(vm, vm.Header);
+    }
+
+    /// <summary>
+    /// Double-tap on blank space in a tree row (not the text label, not a Button) →
+    /// toggle expand / collapse.
+    /// </summary>
     private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
     {
+        // If the TextBlock's DoubleTapped handler already handled the event (inline rename),
+        // skip expand/collapse. Belt-and-suspenders: also bail if source is a TextBlock in
+        // case Avalonia gesture routing raises a fresh event instance per subscriber.
+        if (e.Handled) return;
+        if (e.Source is TextBlock) return;
+        if (e.Source is Button) return;
         if (e.Source is not Control src) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
@@ -2561,7 +2590,7 @@ public partial class MainWindow : Window
     {
         var vm = TreeBuilder.FindNodeForData(_treeRoots, frame);
         if (vm is null) return;
-        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+        BeginInlineRename(vm, vm.Header);
     }
 
     private void CommitInlineRename(TreeNodeVm vm, string newName)
@@ -2576,14 +2605,13 @@ public partial class MainWindow : Window
         }
         else if (vm.Data is AnimationFrameSave frame)
         {
-            if (newName != (frame.TextureName ?? string.Empty))
+            // Rename updates frame.Name (the display label) — never frame.TextureName,
+            // which holds the actual texture path and must not be cleared.
+            if (newName != frame.Name)
             {
-                _appCommands.RenameFrame(frame, newName);
-                var frameChain = _objectFinder.GetAnimationChainContaining(frame);
-                if (frameChain is not null) _appCommands.RefreshTreeNode(frameChain);
-                _appCommands.RefreshWireframe();
-                RefreshTextureCombo();
-                _events.RaiseAnimationChainsChanged();
+                frame.Name = newName;
+                _appCommands.RefreshTreeNode(frame);
+                _appCommands.SaveCurrentAnimationChainList();
             }
         }
 
