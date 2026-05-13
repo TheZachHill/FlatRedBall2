@@ -909,4 +909,65 @@ public class HeadlessTreeViewTests
         }
         finally { window.Close(); }
     }
+
+    [AvaloniaFact]
+    public void RenameChain_DoesNotCollapseChainNode()
+    {
+        // Regression: double-click rename was collapsing the chain node because
+        // OnAnimTreeDoubleTapped toggled IsExpanded even when the TextBlock's
+        // DoubleTapped handler had already handled the event.
+        // This test verifies that the rename flow (AppCommands.RenameChain →
+        // RefreshChainNode) leaves IsExpanded untouched.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var chainNode = GetRoots(GetTree(window))[0];
+            chainNode.IsExpanded = true;
+
+            ctx.AppCommands.RenameChain(chain, "Walk Renamed");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(chainNode.IsExpanded, "Chain node must stay expanded after inline rename.");
+            Assert.Equal("Walk Renamed", chainNode.Header);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RenameFrameLabel_DoesNotCollapseParentChainNode()
+    {
+        // Regression: after committing a frame inline rename the parent chain was
+        // collapsing. This test verifies that setting frame.Name + RefreshTreeNode
+        // (the CommitInlineRename path for frames) leaves the parent IsExpanded intact.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { TextureName = "a.png" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var chainNode = GetRoots(GetTree(window))[0];
+            chainNode.IsExpanded = true;
+
+            // Simulate CommitInlineRename for a frame: set Name + RefreshTreeNode
+            frame.Name = "My Frame";
+            ctx.AppCommands.RefreshTreeNode(frame);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(chainNode.IsExpanded, "Parent chain node must stay expanded after frame label rename.");
+            Assert.Equal("My Frame", chainNode.Children[0].Header);
+        }
+        finally { window.Close(); }
+    }
 }
