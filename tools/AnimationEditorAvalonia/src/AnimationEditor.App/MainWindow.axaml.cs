@@ -759,11 +759,14 @@ public partial class MainWindow : Window
         // Blank-space double-tap: expand / collapse the node
         AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
 
-        // Bubble-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel)
+        // Tunnel-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel).
+        // Must be Tunnel (not Bubble) so we intercept Enter/Escape BEFORE the event
+        // reaches TreeViewItem.OnKeyDown, which in Avalonia 12.x handles Key.Enter by
+        // toggling IsExpanded — collapsing the chain mid-rename if we arrive too late.
         AnimTree.AddHandler(
             InputElement.KeyDownEvent,
             OnInlineRenameKeyDown,
-            RoutingStrategies.Bubble);
+            RoutingStrategies.Tunnel);
 
         // Bubble-phase LostFocus from the inline TextBox: commit
         AnimTree.AddHandler(
