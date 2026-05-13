@@ -260,6 +260,116 @@ public class TreeBuilderPureTests
 
         Assert.Null(TreeBuilder.FindNodeForData(roots, unrelated));
     }
+
+    // ── SyncFramesInto ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SyncFramesInto_Reorder_ReusesExistingFrameVm()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+
+        var originalVmA = chainNode.Children[0];
+        var originalVmB = chainNode.Children[1];
+
+        // Reorder: put B first
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+
+        Assert.Same(originalVmA, chainNode.Children[1]);
+        Assert.Same(originalVmB, chainNode.Children[0]);
+    }
+
+    [Fact]
+    public void SyncFramesInto_Reorder_ChildOrderMatchesNewFrameOrder()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var frameC = new AnimationFrameSave { TextureName = "c.png" };
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, 2));
+
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB });
+
+        Assert.Same(frameC, chainNode.Children[0].Data);
+        Assert.Same(frameA, chainNode.Children[1].Data);
+        Assert.Same(frameB, chainNode.Children[2].Data);
+    }
+
+    [Fact]
+    public void SyncFramesInto_Reorder_PreservesIsExpanded()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+
+        chainNode.Children[0].IsExpanded = true;  // mark frameA VM expanded
+        var vmA = chainNode.Children[0];
+
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+
+        Assert.True(vmA.IsExpanded);
+    }
+
+    [Fact]
+    public void SyncFramesInto_AddedFrame_InsertsNewVm()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var frameC = new AnimationFrameSave { TextureName = "c.png" };
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC, frameB });
+
+        Assert.Equal(3, chainNode.Children.Count);
+        Assert.Same(frameC, chainNode.Children[1].Data);
+    }
+
+    [Fact]
+    public void SyncFramesInto_RemovedFrame_RemovesVm()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var frameC = new AnimationFrameSave { TextureName = "c.png" };
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameC, 2));
+
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameA, frameC });
+
+        Assert.Equal(2, chainNode.Children.Count);
+        Assert.Same(frameA, chainNode.Children[0].Data);
+        Assert.Same(frameC, chainNode.Children[1].Data);
+    }
+
+    [Fact]
+    public void SyncFramesInto_Reorder_UpdatesHeaderForUnnamedFrame()
+    {
+        var frameA = new AnimationFrameSave { TextureName = "" };  // unnamed: "Frame 1"
+        var frameB = new AnimationFrameSave { TextureName = "" };  // unnamed: "Frame 2"
+        var chainNode = new TreeNodeVm();
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameA, 0));
+        chainNode.Children.Add(TreeBuilder.BuildFrameNode(frameB, 1));
+
+        Assert.Equal("Frame 1", chainNode.Children[0].Header);
+
+        // Move frameA to index 1
+        TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
+
+        // VM for frameA is now at index 1 → header should be "Frame 2"
+        var vmA = chainNode.Children[1];
+        Assert.Same(frameA, vmA.Data);
+        Assert.Equal("Frame 2", vmA.Header);
+    }
 }
 
 // ── SyncShapesInto tests ──────────────────────────────────────────────────────

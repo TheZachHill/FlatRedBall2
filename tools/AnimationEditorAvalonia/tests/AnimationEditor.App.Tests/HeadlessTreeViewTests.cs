@@ -838,6 +838,45 @@ public class HeadlessTreeViewTests
     }
 
     [AvaloniaFact]
+    public void MoveFrame_PreservesFrameVmIdentityAndSelection()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain  = new AnimationChainSave { Name = "Walk" };
+            var frameA = new AnimationFrameSave { TextureName = "a.png" };
+            var frameB = new AnimationFrameSave { TextureName = "b.png" };
+            chain.Frames.Add(frameA);
+            chain.Frames.Add(frameB);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree      = GetTree(window);
+            var chainNode = GetRoots(tree)[0];
+            var frameAVm  = chainNode.Children[0];
+            Assert.Same(frameA, frameAVm.Data);
+
+            // Select frameA in the tree and mark it expanded
+            tree.SelectedItems!.Add(frameAVm);
+            frameAVm.IsExpanded = true;
+
+            // Move frameA down one position
+            ctx.AppCommands.MoveFrame(frameA, chain, +1);
+            Dispatcher.UIThread.RunJobs();
+
+            // Same VM instance should now be at index 1
+            Assert.Same(frameAVm, chainNode.Children[1]);
+            // Avalonia selection must survive (relies on object identity)
+            Assert.Contains(frameAVm, tree.SelectedItems.Cast<TreeNodeVm>());
+            // Expanded state must be preserved
+            Assert.True(frameAVm.IsExpanded);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void PropFrameLen_ValueChanged_UpdatesFrameMetaImmediately()
     {
         var (window, ctx) = CreateWindow();
