@@ -169,19 +169,20 @@ public class TreeNodeIconSizeTests
         Directory.CreateDirectory(dir);
         try
         {
+            // Seed the decode cache with a known 64×64 source bitmap. A real PNG round-trip
+            // (SKBitmap.Encode → file → SKBitmap.Decode) is left out on purpose: it made this
+            // test depend on native PNG decode, which mis-sized the bitmap on the Linux CI
+            // runner. ResolveTexturePath only needs the texture file to *exist*, not decode.
             var pngPath = Path.Combine(dir, "red.png");
-            using (var bm = new SKBitmap(64, 64))
-            {
-                bm.Erase(SKColors.Red);
-                using var data = bm.Encode(SKEncodedImageFormat.Png, 100);
-                File.WriteAllBytes(pngPath, data.ToArray());
-            }
-            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+            File.WriteAllBytes(pngPath, [0]);
+            var source = new SKBitmap(64, 64);
+            source.Erase(SKColors.Red);
+            ctx.ThumbnailService.BitmapCache[pngPath] = source;
 
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(new AnimationFrameSave
             {
-                TextureName     = "red.png",
+                TextureName     = pngPath,   // absolute — resolves without a saved .achx
                 LeftCoordinate  = 0f, TopCoordinate    = 0f,
                 RightCoordinate = 1f, BottomCoordinate = 1f,
             });
