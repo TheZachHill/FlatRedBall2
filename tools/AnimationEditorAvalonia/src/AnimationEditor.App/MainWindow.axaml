@@ -111,9 +111,10 @@
                         VerticalAlignment="Center"
                         IsHitTestVisible="False">
                 <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
-                       Width="16" Height="16" VerticalAlignment="Center" />
+                       Width="16" Height="16" />
                 <TextBlock Text="AnimationEditor"
                            FontSize="12"
+                           LineHeight="16"
                            Foreground="{StaticResource InkMid}" />
             </StackPanel>
             </Grid>
