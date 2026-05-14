@@ -496,12 +496,10 @@ public partial class MainWindow : Window
 
     private void SetHistoryVisible(bool visible)
     {
-        HistoryHeaderBorder.IsVisible = visible;
         HistorySplitter.IsVisible = visible;
-        HistoryList.IsVisible = visible;
-        InspectorColumnGrid.RowDefinitions[2].Height = visible ? GridLength.Auto : new GridLength(0);
-        InspectorColumnGrid.RowDefinitions[3].Height = visible ? new GridLength(4) : new GridLength(0);
-        InspectorColumnGrid.RowDefinitions[4].Height = visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        HistorySectionGrid.IsVisible = visible;
+        InspectorColumnGrid.RowDefinitions[2].Height = visible ? new GridLength(4) : new GridLength(0);
+        InspectorColumnGrid.RowDefinitions[3].Height = visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         MenuShowHistory.IsEnabled = !visible;
     }
 

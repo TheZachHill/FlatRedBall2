@@ -740,7 +740,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Middle: Property Inspector ── -->
-            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,*,Auto,4,*">
+            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,*,4,*">
 
                 <!-- ── Inspector pane header ── -->
                 <Border Grid.Row="0"
@@ -1003,74 +1003,93 @@
                     </ScrollViewer>
                 </Border>
 
-                <!-- ── History pane header ── -->
-                <Border x:Name="HistoryHeaderBorder"
-                        Grid.Row="2"
-                        Background="{StaticResource BgRail}"
-                        BorderBrush="{StaticResource LineBrush}"
-                        BorderThickness="1,1,0,1"
-                        Height="36">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0"
-                                   Text="HISTORY"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource InkMid}"
-                                   VerticalAlignment="Center"
-                                   Margin="10,0" />
-                        <StackPanel Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    Spacing="2"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,4,0">
-                            <Button x:Name="HistoryUndoButton"
-                                    Content="↩"
-                                    FontSize="13"
-                                    Width="26" Height="26"
-                                    Padding="0"
-                                    ToolTip.Tip="Undo" />
-                            <Button x:Name="HistoryRedoButton"
-                                    Content="↪"
-                                    FontSize="13"
-                                    Width="26" Height="26"
-                                    Padding="0"
-                                    ToolTip.Tip="Redo" />
-                            <Button x:Name="HistoryCloseButton"
-                                    Content="✕"
-                                    FontSize="11"
-                                    Width="26" Height="26"
-                                    Padding="0"
-                                    ToolTip.Tip="Close History" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
                 <!-- ── History pane splitter ── -->
                 <GridSplitter x:Name="HistorySplitter"
-                              Grid.Row="3"
+                              Grid.Row="2"
                               ResizeDirection="Rows"
                               Background="{StaticResource LineBrush}"
                               HorizontalAlignment="Stretch"
                               Height="4" />
 
-                <!-- ── History list ── -->
-                <ListBox x:Name="HistoryList"
-                         Grid.Row="4"
-                         Background="{StaticResource BgPanel}"
-                         BorderBrush="{StaticResource LineBrush}"
-                         BorderThickness="1,0,0,0"
-                         Padding="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate x:DataType="appModels:HistoryEntryVm">
-                            <TextBlock Text="{Binding Description}"
+                <!-- ── History section (header + list) ── -->
+                <Grid x:Name="HistorySectionGrid"
+                      Grid.Row="3"
+                      RowDefinitions="Auto,*">
+
+                    <!-- ── History pane header ── -->
+                    <Border x:Name="HistoryHeaderBorder"
+                            Grid.Row="0"
+                            Background="{StaticResource BgRail}"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1,1,0,1"
+                            Height="36">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="HISTORY"
                                        FontSize="11"
-                                       Foreground="{Binding Foreground}"
-                                       Padding="8,3"
-                                       TextTrimming="CharacterEllipsis" />
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkMid}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0" />
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="2"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,4,0">
+                                <Button x:Name="HistoryUndoButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Undo">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconUndo.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                                <Button x:Name="HistoryRedoButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Redo">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconRedo.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                                <Button x:Name="HistoryCloseButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Close History">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconClose.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ── History list ── -->
+                    <ListBox x:Name="HistoryList"
+                             Grid.Row="1"
+                             Background="{StaticResource BgPanel}"
+                             BorderBrush="{StaticResource LineBrush}"
+                             BorderThickness="1,0,0,0"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="appModels:HistoryEntryVm">
+                                <TextBlock Text="{Binding Description}"
+                                           FontSize="11"
+                                           Foreground="{Binding Foreground}"
+                                           Padding="8,3"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                </Grid>
 
             </Grid>
         </Grid>
