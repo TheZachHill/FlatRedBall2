@@ -1499,9 +1499,10 @@ public partial class MainWindow : Window
         void UpdateLabel()
         {
             float val = (float)(durationInput.Value ?? 0m);
-            perFrameLabel.Text = radioSetAll.IsChecked == true
-                ? $"Each frame: {val / frameCount:F3} seconds"
-                : string.Empty;
+            bool showLabel = radioSetAll.IsChecked == true;
+            perFrameLabel.IsVisible = showLabel;
+            if (showLabel)
+                perFrameLabel.Text = $"Each frame: {val / frameCount:F3} seconds";
         }
 
         durationInput.ValueChanged       += (_, _) => UpdateLabel();
