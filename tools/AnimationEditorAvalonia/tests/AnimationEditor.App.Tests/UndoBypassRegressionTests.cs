@@ -1,26 +1,23 @@
-using System.Collections.ObjectModel;
-using System.Reflection;
 using AnimationEditor.Core;
-using AnimationEditor.Core.IO;
-using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Regression coverage for App-layer mutation paths that used to bypass the undo
-/// stack entirely: the flip toggle buttons and multi-select delete. All project
-/// mutation must flow through <c>IUndoManager.Execute</c>.
+/// Regression coverage for an App-layer mutation path that used to bypass the undo
+/// stack entirely: the flip toggle buttons must route through <c>IUndoManager.Execute</c>.
 ///
-/// <para>The paste path (<c>HandlePasteAsync</c>) is not covered here: its only
-/// untested residue is the system-clipboard read (the headless <c>IClipboard</c>
-/// has no text-write API to seed it). The mutating core it delegates to —
-/// <c>IAppCommands.PasteChains/PasteFrames/PasteRectangle/PasteCircle</c> — is
-/// covered by <c>AnimationEditor.Core.Tests.AppCommandsPasteTests</c>.</para>
+/// <para>Multi-select delete is <em>not</em> covered here — that logic lives on
+/// <c>AppCommands</c> and is exercised by pure <c>[Fact]</c> tests in
+/// <c>AnimationEditor.Core.Tests.AppCommandsDeleteAsyncTests</c>. Likewise the paste
+/// path's mutating core is covered by
+/// <c>AnimationEditor.Core.Tests.AppCommandsPasteTests</c>. Only the genuinely
+/// UI-bound wiring stays in this headless-Avalonia file.</para>
 /// </summary>
 public class UndoBypassRegressionTests
 {
@@ -30,24 +27,14 @@ public class UndoBypassRegressionTests
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
         ctx.ProjectManager.FileName = null;
         ctx.SelectedState.SelectedChain = null;
-        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
-        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
 
+        // Note: the MainWindow constructor re-wires AppCommands.ConfirmAsync /
+        // PromptStringAsync / FileDialogService to its own dialogs, so any test stub
+        // for those must be assigned *after* CreateMainWindow(), not before.
         var window = ctx.CreateMainWindow();
         window.Show();
         return (window, ctx);
     }
-
-    private static TreeView GetTree(MainWindow w)
-        => w.FindControl<TreeView>("AnimTree")!;
-
-    private static ObservableCollection<TreeNodeVm> GetRoots(TreeView tree)
-        => (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
-
-    private static void Invoke(MainWindow window, string method)
-        => typeof(MainWindow)
-            .GetMethod(method, BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(window, null);
 
     /// <summary>Adds a chain with <paramref name="frameCount"/> shaped frames to the project.</summary>
     private static AnimationChainSave MakeChain(TestServices ctx, string name, int frameCount)
@@ -97,72 +84,14 @@ public class UndoBypassRegressionTests
             flipH.IsChecked = true;
 
             ctx.UndoManager.Undo();
+            // The toggle re-syncs via HandleAnimationChainsChanged →
+            // Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel); pump the
+            // dispatcher queue so that runs before asserting on the button.
+            Dispatcher.UIThread.RunJobs();
 
             // The model is unflipped again, so the button must not stay lit.
             Assert.False(frame.FlipHorizontal);
             Assert.False(flipH.IsChecked == true);
-        }
-        finally { window.Close(); }
-    }
-
-    // ── Multi-select delete ───────────────────────────────────────────────────
-
-    [AvaloniaFact]
-    public void HandleDelete_MultipleChainsSelected_DeletesAllInOneUndoStep()
-    {
-        var (window, ctx) = CreateWindow();
-        try
-        {
-            var a = MakeChain(ctx, "A", 1);
-            var b = MakeChain(ctx, "B", 1);
-            var tree = GetTree(window);
-            var roots = GetRoots(tree);
-            var vmA = new TreeNodeVm { Header = "A", Data = a };
-            roots.Add(vmA);
-            roots.Add(new TreeNodeVm { Header = "B", Data = b });
-            tree.SelectedItem = vmA;
-            ctx.SelectedState.SelectedNodes = new List<object> { a, b };
-
-            Invoke(window, "HandleDelete");
-
-            Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
-            Assert.True(ctx.UndoManager.CanUndo);
-
-            ctx.UndoManager.Undo();
-            Assert.Equal(2, ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Count);
-            Assert.False(ctx.UndoManager.CanUndo); // a single composite step
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void HandleDelete_MultipleRectanglesSelected_DeletesAllInOneUndoStep()
-    {
-        var (window, ctx) = CreateWindow();
-        try
-        {
-            var chain = MakeChain(ctx, "Walk", 1);
-            var frame = chain.Frames[0];
-            var r1 = new AARectSave { Name = "R1" };
-            var r2 = new AARectSave { Name = "R2" };
-            frame.ShapesSave!.AARectSaves.Add(r1);
-            frame.ShapesSave!.AARectSaves.Add(r2);
-
-            var tree = GetTree(window);
-            var roots = GetRoots(tree);
-            var vmR1 = new TreeNodeVm { Header = "R1", Data = r1 };
-            roots.Add(vmR1);
-            tree.SelectedItem = vmR1;
-            ctx.SelectedState.SelectedNodes = new List<object> { r1, r2 };
-
-            Invoke(window, "HandleDelete");
-
-            Assert.Empty(frame.ShapesSave!.AARectSaves);
-            Assert.True(ctx.UndoManager.CanUndo);
-
-            ctx.UndoManager.Undo();
-            Assert.Equal(2, frame.ShapesSave!.AARectSaves.Count);
-            Assert.False(ctx.UndoManager.CanUndo);
         }
         finally { window.Close(); }
     }

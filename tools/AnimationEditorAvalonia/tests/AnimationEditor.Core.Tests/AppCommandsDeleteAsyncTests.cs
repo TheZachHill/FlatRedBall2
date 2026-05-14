@@ -70,6 +70,25 @@ public class AppCommandsDeleteAsyncTests
         }
     }
 
+    [Fact]
+    public async Task AskToDeleteAnimationChains_DeletingMultiple_RecordsSingleUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var a = TestHelpers.MakeChain(ctx.Acls, "A");
+        var b = TestHelpers.MakeChain(ctx.Acls, "B");
+
+        await ctx.AppCommands.AskToDeleteAnimationChains(
+            new List<AnimationChainSave> { a, b });
+        Assert.Empty(ctx.Acls.AnimationChains);
+
+        // One user action is one undo step, and the single undo restores both
+        // chains to their original positions.
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { a, b }, ctx.Acls.AnimationChains);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
     // ── AskToDeleteFrames ─────────────────────────────────────────────────────
 
     [Fact]
