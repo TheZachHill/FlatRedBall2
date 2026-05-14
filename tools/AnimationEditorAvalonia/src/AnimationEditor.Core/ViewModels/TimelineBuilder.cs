@@ -8,9 +8,10 @@ public static class TimelineBuilder
 {
     /// <summary>
     /// Minimum cell width in pixels for zero-length (or negative-length) frames.
+    /// Must be wide enough to contain the 22px thumbnail image plus its 1px border on each side (24px total).
     /// Keeps such frames visible and clickable even though the playhead treats them as instantaneous.
     /// </summary>
-    public const double MinCellWidth = 12.0;
+    public const double MinCellWidth = 24.0;
     public const double PixelsPerSecond = 120.0;
 
     public static List<TimelineFrameVm> BuildFrameItems(AnimationChainSave? chain)
