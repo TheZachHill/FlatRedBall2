@@ -1,19 +1,22 @@
-using System;
+using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Regression tests for issue #239: modal confirmation dialogs must be
-/// keyboard-accessible — ENTER confirms, ESC cancels. Covers the yes/no
-/// confirmation dialog and the shared <see cref="MainWindow.WireDialogKeyboard"/>
-/// helper used by the dialogs that contain input controls.
+/// keyboard-accessible — ENTER confirms, ESC cancels, immediately on open
+/// without a prior click. Covers the yes/no confirmation dialog and the shared
+/// <see cref="MainWindow.WireDialogKeyboard"/> helper used by the dialogs that
+/// contain input controls.
 /// </summary>
 public class ConfirmDialogKeyboardTests
 {
@@ -25,6 +28,11 @@ public class ConfirmDialogKeyboardTests
             Key = key,
         });
 
+    // Simulates real keyboard input through the focus pipeline — unlike RaiseEvent,
+    // this only reaches a handler if something inside the window is actually focused.
+    private static void PressKey(Window dialog, Key key) =>
+        dialog.KeyPress(key, RawInputModifiers.None, PhysicalKey.None, null);
+
     [AvaloniaFact]
     public void BuildConfirmDialog_EnterKey_ResolvesTrue()
     {
@@ -33,7 +41,7 @@ public class ConfirmDialogKeyboardTests
         dialog.Show();
         Dispatcher.UIThread.RunJobs();
 
-        RaiseKey(dialog, Key.Enter);
+        PressKey(dialog, Key.Enter);
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(tcs.Task.IsCompletedSuccessfully, "ENTER should dismiss the dialog");
@@ -48,7 +56,7 @@ public class ConfirmDialogKeyboardTests
         dialog.Show();
         Dispatcher.UIThread.RunJobs();
 
-        RaiseKey(dialog, Key.Escape);
+        PressKey(dialog, Key.Escape);
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(tcs.Task.IsCompletedSuccessfully, "ESC should dismiss the dialog");
@@ -71,9 +79,64 @@ public class ConfirmDialogKeyboardTests
     }
 
     // ── WireDialogKeyboard ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A freshly-opened window has no focused element, so keyboard input is not
+    /// routed anywhere. WireDialogKeyboard must move focus into the dialog on open
+    /// so ENTER/ESC work without the user clicking a control first.
+    /// </summary>
+    [AvaloniaFact]
+    public void WireDialogKeyboard_OnOpen_MovesFocusIntoDialog()
+    {
+        var dialog = new Window
+        {
+            Content = new StackPanel
+            {
+                Children = { new Button { Content = "OK" }, new Button { Content = "Cancel" } }
+            }
+        };
+        MainWindow.WireDialogKeyboard(dialog, onConfirm: () => { }, onCancel: () => { });
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var focused = dialog.FocusManager?.GetFocusedElement();
+        Assert.NotNull(focused);
+        Assert.Contains((Visual)focused!, dialog.GetVisualDescendants());
+        dialog.Close();
+    }
+
+    /// <summary>
+    /// Drives real keyboard input through the focus pipeline on an untouched
+    /// dialog containing a NumericUpDown — ESC must cancel. (The headless input
+    /// backend routes unfocused keys to the window, so the no-focus gap itself is
+    /// guarded by <see cref="WireDialogKeyboard_OnOpen_MovesFocusIntoDialog"/>;
+    /// this covers the input path end-to-end.)
+    /// </summary>
+    [AvaloniaFact]
+    public void WireDialogKeyboard_FreshDialog_EscapeCancelsWithoutClickingFirst()
+    {
+        bool cancelled = false;
+        var dialog = new Window
+        {
+            Content = new StackPanel
+            {
+                Children = { new NumericUpDown { Value = 1 }, new Button { Content = "OK" } }
+            }
+        };
+        MainWindow.WireDialogKeyboard(dialog, onConfirm: () => { }, onCancel: () => cancelled = true);
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        PressKey(dialog, Key.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(cancelled, "ESC must cancel a freshly-opened dialog without a prior click");
+        dialog.Close();
+    }
+
     // The Adjust Offsets / Resize Texture / Adjust Frame Time dialogs contain
     // input controls (NumericUpDown) whose focused inner control can mark the
-    // Escape KeyDown handled before it bubbles to the window — so Button.IsCancel
+    // key event handled before it bubbles to the window — so Button.IsCancel
     // never fires. WireDialogKeyboard attaches at the window with
     // handledEventsToo:true to survive that.
 

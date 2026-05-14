@@ -2022,6 +2022,9 @@ public partial class MainWindow : Window
     /// (e.g. <see cref="NumericUpDown"/>) has already marked the key event handled —
     /// which is why <see cref="Button.IsDefault"/>/<see cref="Button.IsCancel"/> alone
     /// are unreliable for dialogs that contain text or numeric inputs.
+    /// Also moves focus into the dialog on open: a freshly-shown window has no
+    /// focused element, and keyboard input is not routed anywhere until something
+    /// is focused, so without this ENTER/ESC do nothing until the user clicks.
     /// </summary>
     internal static void WireDialogKeyboard(Window dialog, Action onConfirm, Action onCancel)
     {
@@ -2030,6 +2033,12 @@ public partial class MainWindow : Window
             if (e.Key == Key.Enter)       { onConfirm(); e.Handled = true; }
             else if (e.Key == Key.Escape) { onCancel();  e.Handled = true; }
         }, RoutingStrategies.Bubble, handledEventsToo: true);
+
+        dialog.Opened += (_, _) =>
+            dialog.GetVisualDescendants()
+                  .OfType<InputElement>()
+                  .FirstOrDefault(x => x is { Focusable: true, IsEffectivelyVisible: true, IsEffectivelyEnabled: true })
+                  ?.Focus();
     }
 
     // ── String-input dialog helper ────────────────────────────────────────────
@@ -2319,11 +2328,13 @@ public partial class MainWindow : Window
         };
         var incrToggle = new CheckBox { Content = "Increment UV", IsChecked = true };
 
-        var ok     = new Button { Content = "OK", IsDefault = true };
+        // Cancelling zeroes the count; the post-dialog code treats count <= 0 as "do nothing".
+        void Cancel() { countInput.Value = 0; dialog.Close(); }
+
+        var ok     = new Button { Content = "OK" };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => dialog.Close();
-        cancel.Click += (_, _) => { countInput.Value = 0; dialog.Close(); };
-        dialog.Closed += (_, _) => { };
+        cancel.Click += (_, _) => Cancel();
 
         var btns = new StackPanel
         {
@@ -2340,6 +2351,8 @@ public partial class MainWindow : Window
         panel.Children.Add(incrToggle);
         panel.Children.Add(btns);
         dialog.Content = panel;
+
+        WireDialogKeyboard(dialog, onConfirm: dialog.Close, onCancel: Cancel);
 
         await dialog.ShowDialog(this);
 
