@@ -1492,15 +1492,7 @@ public partial class MainWindow : Window
         panel.Children.Add(radioSetAll);
         panel.Children.Add(perFrameLabel);
 
-        var okBtn = new Button
-        {
-            Content = "OK",
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
-        };
-        panel.Children.Add(okBtn);
-        dialog.Content = panel;
-
-        okBtn.Click += (_, _) =>
+        void Apply()
         {
             if (durationInput.Value.HasValue)
             {
@@ -1511,7 +1503,25 @@ public partial class MainWindow : Window
                     _appCommands.ScaleFrameTimesSetAllSame(chain, newTotal);
             }
             dialog.Close();
+        }
+
+        var okBtn     = new Button { Content = "OK" };
+        var cancelBtn = new Button { Content = "Cancel" };
+        okBtn.Click     += (_, _) => Apply();
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        var btns = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
         };
+        btns.Children.Add(okBtn);
+        btns.Children.Add(cancelBtn);
+        panel.Children.Add(btns);
+        dialog.Content = panel;
+
+        WireDialogKeyboard(dialog, onConfirm: Apply, onCancel: dialog.Close);
 
         _ = dialog.ShowDialog(this);
     }
@@ -2031,7 +2041,18 @@ public partial class MainWindow : Window
     private async Task<bool> ShowConfirmDialogAsync(string message, string title)
     {
         var tcs = new TaskCompletionSource<bool>();
+        var dialog = BuildConfirmDialog(message, title, tcs);
+        await dialog.ShowDialog(this);
+        return await tcs.Task;
+    }
 
+    /// <summary>
+    /// Builds the yes/no confirmation dialog. ENTER confirms (Yes), ESC cancels
+    /// (No), and closing the window by any other means resolves
+    /// <paramref name="tcs"/> to false. Extracted for testability.
+    /// </summary>
+    internal static Window BuildConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
+    {
         var dialog = new Window
         {
             Title = title,
@@ -2065,8 +2086,37 @@ public partial class MainWindow : Window
         dialog.Content = panel;
         dialog.Closed += (_, _) => tcs.TrySetResult(false);
 
-        await dialog.ShowDialog(this);
-        return await tcs.Task;
+        WireDialogKeyboard(dialog,
+            onConfirm: () => { tcs.TrySetResult(true);  dialog.Close(); },
+            onCancel:  () => { tcs.TrySetResult(false); dialog.Close(); });
+
+        return dialog;
+    }
+
+    /// <summary>
+    /// Wires ENTER → <paramref name="onConfirm"/> and ESC → <paramref name="onCancel"/>
+    /// on a modal dialog. The handler is attached at the window with
+    /// <c>handledEventsToo: true</c> so it still fires when a focused input control
+    /// (e.g. <see cref="NumericUpDown"/>) has already marked the key event handled —
+    /// which is why <see cref="Button.IsDefault"/>/<see cref="Button.IsCancel"/> alone
+    /// are unreliable for dialogs that contain text or numeric inputs.
+    /// Also moves focus into the dialog on open: a freshly-shown window has no
+    /// focused element, and keyboard input is not routed anywhere until something
+    /// is focused, so without this ENTER/ESC do nothing until the user clicks.
+    /// </summary>
+    internal static void WireDialogKeyboard(Window dialog, Action onConfirm, Action onCancel)
+    {
+        dialog.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.Enter)       { onConfirm(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { onCancel();  e.Handled = true; }
+        }, RoutingStrategies.Bubble, handledEventsToo: true);
+
+        dialog.Opened += (_, _) =>
+            dialog.GetVisualDescendants()
+                  .OfType<InputElement>()
+                  .FirstOrDefault(x => x is { Focusable: true, IsEffectivelyVisible: true, IsEffectivelyEnabled: true })
+                  ?.Focus();
     }
 
     // ── String-input dialog helper ────────────────────────────────────────────
@@ -2350,11 +2400,13 @@ public partial class MainWindow : Window
         };
         var incrToggle = new CheckBox { Content = "Increment UV", IsChecked = true };
 
-        var ok     = new Button { Content = "OK", IsDefault = true };
+        // Cancelling zeroes the count; the post-dialog code treats count <= 0 as "do nothing".
+        void Cancel() { countInput.Value = 0; dialog.Close(); }
+
+        var ok     = new Button { Content = "OK" };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => dialog.Close();
-        cancel.Click += (_, _) => { countInput.Value = 0; dialog.Close(); };
-        dialog.Closed += (_, _) => { };
+        cancel.Click += (_, _) => Cancel();
 
         var btns = new StackPanel
         {
@@ -2371,6 +2423,8 @@ public partial class MainWindow : Window
         panel.Children.Add(incrToggle);
         panel.Children.Add(btns);
         dialog.Content = panel;
+
+        WireDialogKeyboard(dialog, onConfirm: dialog.Close, onCancel: Cancel);
 
         await dialog.ShowDialog(this);
 
@@ -2424,8 +2478,10 @@ public partial class MainWindow : Window
         offsetModeRow.IsVisible = false;
 
         bool confirmed = false;
-        var ok = new Button { Content = "OK", IsDefault = true };
-        ok.Click += (_, _) => { confirmed = true; dialog.Close(); };
+        void Confirm() { confirmed = true; dialog.Close(); }
+
+        var ok = new Button { Content = "OK" };
+        ok.Click += (_, _) => Confirm();
         var cancel = new Button { Content = "Cancel" };
         cancel.Click += (_, _) => dialog.Close();
 
@@ -2445,6 +2501,8 @@ public partial class MainWindow : Window
         panel.Children.Add(offsetModeRow);
         panel.Children.Add(btns);
         dialog.Content = panel;
+
+        WireDialogKeyboard(dialog, onConfirm: Confirm, onCancel: dialog.Close);
 
         await dialog.ShowDialog(this);
         if (!confirmed) return;
@@ -2560,9 +2618,11 @@ public partial class MainWindow : Window
         var hInput = new NumericUpDown { Value = oldH, Minimum = 1, Maximum = 65536, FormatString = "0", Width = 90 };
 
         bool confirmed = false;
-        var ok     = new Button { Content = "OK", IsDefault = true };
+        void Confirm() { confirmed = true; dialog.Close(); }
+
+        var ok     = new Button { Content = "OK" };
         var cancel = new Button { Content = "Cancel" };
-        ok.Click     += (_, _) => { confirmed = true; dialog.Close(); };
+        ok.Click     += (_, _) => Confirm();
         cancel.Click += (_, _) => dialog.Close();
 
         var btns = new StackPanel
@@ -2588,6 +2648,8 @@ public partial class MainWindow : Window
         panel.Children.Add(hRow);
         panel.Children.Add(btns);
         dialog.Content = panel;
+
+        WireDialogKeyboard(dialog, onConfirm: Confirm, onCancel: dialog.Close);
 
         await dialog.ShowDialog(this);
         if (!confirmed) return;
