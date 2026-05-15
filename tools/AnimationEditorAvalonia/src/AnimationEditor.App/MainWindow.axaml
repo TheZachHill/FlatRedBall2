@@ -648,9 +648,9 @@
 
                     <!-- ── Timeline strip ── -->
                     <Grid Grid.Row="2" RowDefinitions="14,*">
-                        <!-- ruler header -->
+                        <!-- ruler header — BgRail matches the wireframe/preview toolbars -->
                         <Border Grid.Row="0"
-                                Background="{StaticResource BgCanvas}"
+                                Background="{StaticResource BgRail}"
                                 BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="0,1,0,1">
                             <TextBlock Text="TIMELINE"
@@ -659,7 +659,7 @@
                                        VerticalAlignment="Center"
                                        Margin="6,0" />
                         </Border>
-                        <!-- frame cells -->
+                        <!-- frame cells — BgCanvas background so cells (BgPanel) contrast against it -->
                         <Border Grid.Row="1"
                                 Background="{StaticResource BgCanvas}"
                                 BorderBrush="{StaticResource LineBrush}"
@@ -677,7 +677,7 @@
                                             <Grid Width="{Binding Width}" Height="38">
                                                 <Border BorderBrush="{StaticResource LineBrush}"
                                                         BorderThickness="0,0,1,0"
-                                                        Background="Transparent">
+                                                        Background="{StaticResource BgPanel}">
                                                     <StackPanel VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center"
                                                                 Spacing="2">
