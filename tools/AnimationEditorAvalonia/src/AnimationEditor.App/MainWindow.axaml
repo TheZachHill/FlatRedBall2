@@ -283,15 +283,13 @@
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
                         </Style>
-                        <!-- For leaf items the Fluent theme keeps the chevron container visible but
-                             sets its Width=12 (TreeViewItemExpandCollapseChevronSize) via a more-
-                             specific :empty style.  The Panel has no IsVisible binding in the Avalonia
-                             12 template, so hiding it here is unconditional and wins the value race.
-                             The spacer in the TreeDataTemplate (bound to IsLeafFrameNode) then adds
-                             TreeViewItemMinHeight of space, giving leaf frame rows the same indent as
-                             non-leaf frame rows. -->
+                        <!-- The Fluent theme's :empty style overrides the panel width to 12px for
+                             leaf items, causing their content to start ~20px left of non-leaf items.
+                             Override it here with the same full width so leaf and non-leaf items
+                             always indent identically.  The ToggleButton inside is already hidden for
+                             :empty items by the Fluent theme; the panel becomes an invisible spacer. -->
                         <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
-                            <Setter Property="IsVisible" Value="False" />
+                            <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
                         </Style>
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
                             <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -331,14 +329,7 @@
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
                             <Grid ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Stretch">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <!-- Spacer for leaf frame nodes: reserves the same horizontal space that
-                                         the chevron container occupies for frames that have shapes, preventing
-                                         jagged icon alignment. The TreeViewItem template hides its chevron
-                                         container via TemplateBinding (not overridable with a style setter),
-                                         so we compensate here in the header content instead. -->
-                                    <Border Width="{DynamicResource TreeViewItemMinHeight}"
-                                            IsVisible="{Binding IsLeafFrameNode}" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Node kind icons: SVG files are the single source of truth for path data. -->
                                     <!-- Chain node: first-frame thumbnail when the chain has frames, generic glyph
                                          otherwise. Only the chain ("animation") icon is enlarged so the first-frame
