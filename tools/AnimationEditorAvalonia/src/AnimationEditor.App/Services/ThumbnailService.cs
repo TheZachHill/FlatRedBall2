@@ -27,6 +27,12 @@ public sealed class ThumbnailService
     public ThumbnailService(IProjectManager projectManager) =>
         _projectManager = projectManager;
 
+    /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.</summary>
+    public void InvalidatePath(string absolutePath)
+    {
+        BitmapCache.Remove(absolutePath);
+    }
+
     /// <summary>
     /// Returns the cached decode of <paramref name="path"/>, decoding on first access.
     /// Returns <c>null</c> for a null/empty path or a file that fails to decode (the
