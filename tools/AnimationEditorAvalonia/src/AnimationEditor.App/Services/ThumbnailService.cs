@@ -27,10 +27,13 @@ public sealed class ThumbnailService
     public ThumbnailService(IProjectManager projectManager) =>
         _projectManager = projectManager;
 
-    /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.</summary>
+    /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.
+    /// Normalises backslashes to forward slashes before lookup so FSW-reported paths (backslash
+    /// on Windows) evict entries that were stored via <c>FilePath.FullPath</c> (forward slash).
+    /// </summary>
     public void InvalidatePath(string absolutePath)
     {
-        BitmapCache.Remove(absolutePath);
+        BitmapCache.Remove(absolutePath.Replace('\\', '/'));
     }
 
     /// <summary>

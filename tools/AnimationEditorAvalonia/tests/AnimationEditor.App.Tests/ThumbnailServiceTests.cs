@@ -1,4 +1,5 @@
 using AnimationEditor.App.Services;
+using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
@@ -115,6 +116,50 @@ public class ThumbnailServiceTests
         var rightPx = thumb.GetPixel(thumb.Width - 1, 4);
         Assert.True(rightPx.Red > rightPx.Blue,
             $"Right edge pixel {rightPx} should be red after horizontal flip.");
+    }
+
+    // -- InvalidatePath path-normalization tests (Issue #310) -----------------
+
+    private static ThumbnailService MakeSvc() => new(new TestServices().ProjectManager);
+
+    /// <summary>
+    /// BitmapCache stores paths in forward-slash format (from FilePath.Standardized).
+    /// FSW e.FullPath on Windows uses backslashes. InvalidatePath must evict the cache
+    /// entry regardless of which separator style the caller passes.
+    /// </summary>
+    [Fact]
+    public void InvalidatePath_BackslashPath_EvictsForwardSlashCacheKey()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["D:/Downloads/capybara.png"] = null;
+
+        svc.InvalidatePath(@"D:\Downloads\capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("D:/Downloads/capybara.png"),
+            "InvalidatePath with backslash path must evict the forward-slash cache key.");
+    }
+
+    [Fact]
+    public void InvalidatePath_ForwardSlashPath_EvictsForwardSlashCacheKey()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["D:/Downloads/capybara.png"] = null;
+
+        svc.InvalidatePath("D:/Downloads/capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("D:/Downloads/capybara.png"));
+    }
+
+    [Fact]
+    public void InvalidatePath_MixedCase_EvictsCacheKeyRegardlessOfCase()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["d:/downloads/capybara.png"] = null;
+
+        svc.InvalidatePath(@"D:\Downloads\Capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("d:/downloads/capybara.png"),
+            "OrdinalIgnoreCase + slash normalization must handle mixed-case backslash paths.");
     }
 
     [Fact]
