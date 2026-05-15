@@ -422,9 +422,9 @@ namespace AnimationEditor.Core.CommandsAndState
             var frame = _selectedState.SelectedFrame;
             if (frame?.ShapesSave == null) return new List<string>();
 
-            return frame.ShapesSave!.AARectSaves
-                .Select(r => r.Name)
-                .Concat(frame.ShapesSave!.CircleSaves.Select(c => c.Name))
+            return frame.ShapesSave!.Shapes
+                .Select(s => s switch { AARectSave r => r.Name, CircleSave c => c.Name, _ => null })
+                .OfType<string>()
                 .ToList();
         }
 
@@ -557,32 +557,19 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Frame to Bottom"));
         }
 
-        public void MoveRectangle(AARectSave rectangle, AnimationFrameSave frame, int delta)
+        public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
-            var rects = frame.ShapesSave?.AARectSaves;
-            if (rects is null) return;
-            int idx    = rects.IndexOf(rectangle);
-            int newIdx = Math.Clamp(idx + delta, 0, rects.Count - 1);
+            var shapes = frame.ShapesSave?.Shapes;
+            if (shapes is null) return;
+            int idx    = shapes.IndexOf(shape);
+            if (idx < 0) return;
+            int newIdx = Math.Clamp(idx + delta, 0, shapes.Count - 1);
             if (newIdx == idx) return;
-            _undoManager.Execute(new ReorderCommand<AARectSave>(
-                rects,
-                () => { rects.RemoveAt(idx); rects.Insert(newIdx, rectangle); },
+            _undoManager.Execute(new ReorderCommand<object>(
+                shapes,
+                () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
                 this, _events, () => RefreshTreeNode(frame),
-                delta > 0 ? "Move Rectangle Down" : "Move Rectangle Up"));
-        }
-
-        public void MoveCircle(CircleSave circle, AnimationFrameSave frame, int delta)
-        {
-            var circles = frame.ShapesSave?.CircleSaves;
-            if (circles is null) return;
-            int idx    = circles.IndexOf(circle);
-            int newIdx = Math.Clamp(idx + delta, 0, circles.Count - 1);
-            if (newIdx == idx) return;
-            _undoManager.Execute(new ReorderCommand<CircleSave>(
-                circles,
-                () => { circles.RemoveAt(idx); circles.Insert(newIdx, circle); },
-                this, _events, () => RefreshTreeNode(frame),
-                delta > 0 ? "Move Circle Down" : "Move Circle Up"));
+                delta > 0 ? "Move Shape Down" : "Move Shape Up"));
         }
 
         /// <summary>
@@ -602,12 +589,12 @@ namespace AnimationEditor.Core.CommandsAndState
             if (rect is not null)
             {
                 var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
-                if (ownerFrame is not null) MoveRectangle(rect, ownerFrame, delta);
+                if (ownerFrame is not null) MoveShape(rect, ownerFrame, delta);
             }
             else if (circle is not null)
             {
                 var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
-                if (ownerFrame is not null) MoveCircle(circle, ownerFrame, delta);
+                if (ownerFrame is not null) MoveShape(circle, ownerFrame, delta);
             }
             else if (frame is not null && chain is not null)
                 MoveFrame(frame, chain, delta);
@@ -691,14 +678,20 @@ namespace AnimationEditor.Core.CommandsAndState
                 };
                 if (frame.ShapesSave != null)
                 {
-                    foreach (var r in frame.ShapesSave!.AARectSaves)
-                        fCopy.ShapesSave!.AARectSaves.Add(
-                            new AARectSave
-                            { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                    foreach (var c in frame.ShapesSave!.CircleSaves)
-                        fCopy.ShapesSave!.CircleSaves.Add(
-                            new CircleSave
-                            { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                    foreach (var shape in frame.ShapesSave!.Shapes)
+                    {
+                        switch (shape)
+                        {
+                            case AARectSave r:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
+                                break;
+                            case CircleSave c:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                                break;
+                        }
+                    }
                 }
                 copy.Frames.Add(fCopy);
             }
