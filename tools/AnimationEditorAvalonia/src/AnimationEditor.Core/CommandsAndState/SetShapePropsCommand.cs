@@ -21,7 +21,7 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
         new(frame, rect, rect.Name ?? "", newName,
             rect.X, rect.Y, rect.ScaleX, rect.ScaleY,
             newX, newY, newScaleX, newScaleY,
-            commands, events, "Edit Rectangle");
+            commands, events, ShapeLabel("Rect", rect.Name ?? ""));
 
     public static SetShapePropsCommand ForCircle(
         AnimationFrameSave? frame, CircleSave circ,
@@ -30,7 +30,10 @@ internal sealed class SetShapePropsCommand : IUndoableCommand
         new(frame, circ, circ.Name ?? "", newName,
             circ.X, circ.Y, circ.Radius, 0f,
             newX, newY, newRadius, 0f,
-            commands, events, "Edit Circle");
+            commands, events, ShapeLabel("Circle", circ.Name ?? ""));
+
+    private static string ShapeLabel(string type, string name) =>
+        string.IsNullOrEmpty(name) ? $"Edit {type}" : $"Edit {type} '{name}'";
 
     private SetShapePropsCommand(
         AnimationFrameSave? frame, object shape,
