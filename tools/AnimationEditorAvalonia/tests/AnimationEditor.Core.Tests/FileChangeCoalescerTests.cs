@@ -101,15 +101,30 @@ public class FileChangeCoalescerTests
         Assert.Empty(result);
     }
 
-    // 6. After cooldown expires, events fire normally.
+    // 6. A genuine external edit (event after cooldown window) still fires.
     [Fact]
-    public void Cooldown_AfterExpiry_EventsFire()
+    public void Cooldown_GenuineExternalEditAfterCooldown_Fires()
     {
         var c = Make(debounceMs: 50, cooldownMs: 500);
         c.RecordOwnSave("a.achx", 0);
-        c.Record("a.achx", WatcherChangeType.Modified, 600);  // after cooldown
+        c.Record("a.achx", WatcherChangeType.Modified, 600);  // external edit after cooldown
         var result = c.Flush(700);  // 700-600=100 >= 50 debounce
         Assert.Single(result);
+    }
+
+    // 6b. FSW bounce from own save is discarded permanently — does NOT fire after cooldown elapses.
+    [Fact]
+    public void Cooldown_OwnSaveFswBounce_NeverFiresAfterCooldown()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        c.RecordOwnSave("a.achx", 0);
+        c.Record("a.achx", WatcherChangeType.Modified, 10);  // FSW bounce right after save
+        // During cooldown: suppressed AND discarded
+        var duringCooldown = c.Flush(100);
+        Assert.Empty(duringCooldown);
+        // After cooldown: event was discarded, so still nothing
+        var afterCooldown = c.Flush(700);
+        Assert.Empty(afterCooldown);
     }
 
     // 7. Multiple files tracked independently.

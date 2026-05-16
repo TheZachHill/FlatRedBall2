@@ -96,10 +96,16 @@ namespace AnimationEditor.Core.HotReload
                 {
                     if (nowMs - kv.Value.Ts < DebounceMs) continue; // still in debounce window
 
-                    // Check own-save cooldown
+                    // Discard events that were triggered by our own save.
+                    // Compare the event's timestamp against the save timestamp: if the
+                    // FSW fired within CooldownMs of our save it was caused by that save.
+                    // Remove from pending so it never fires — even after the cooldown elapses.
                     if (_ownSaves.TryGetValue(kv.Key, out long saveTs) &&
-                        nowMs - saveTs < CooldownMs)
+                        kv.Value.Ts - saveTs < CooldownMs)
+                    {
+                        ready.Add(kv.Key);
                         continue;
+                    }
 
                     ready.Add(kv.Key);
                     result.Add((kv.Key, kv.Value.Type));
