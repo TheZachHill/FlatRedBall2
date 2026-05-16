@@ -115,6 +115,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
+        /// <summary>
+        /// Assigns <paramref name="textureName"/> to every frame in <paramref name="chain"/>
+        /// as a single undoable operation. No-op when the chain has no frames.
+        /// </summary>
+        void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
+
         // ── Hot Reload ────────────────────────────────────────────────────────────
 
         /// <summary>

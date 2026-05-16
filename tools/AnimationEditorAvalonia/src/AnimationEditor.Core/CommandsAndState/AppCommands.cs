@@ -970,6 +970,15 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
         }
 
+        public void SetAllFramesTextureName(AnimationChainSave chain, string? textureName)
+        {
+            if (chain.Frames.Count == 0) return;
+            var cmds = chain.Frames
+                .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, this, _events))
+                .ToArray();
+            _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
+        }
+
         // ── Paste (clipboard → project) ───────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.PasteChains"/>

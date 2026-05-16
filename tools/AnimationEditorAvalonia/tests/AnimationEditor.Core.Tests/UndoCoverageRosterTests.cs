@@ -93,6 +93,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AdjustUVAfterResize)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrameFromPixelBounds)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameTextureName)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetAllFramesTextureName)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteChains)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
@@ -253,6 +254,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8, 64, 64)));
         yield return Row(nameof(IAppCommands.SetFrameTextureName),
             ctx => Sync(() => ctx.AppCommands.SetFrameTextureName(Zebra(ctx).Frames[0], "set.png")));
+        yield return Row(nameof(IAppCommands.SetAllFramesTextureName),
+            ctx => Sync(() => ctx.AppCommands.SetAllFramesTextureName(Zebra(ctx), "bulk.png")));
         yield return Row(nameof(IAppCommands.PasteChains),
             ctx => Sync(() => ctx.AppCommands.PasteChains(
                 new List<AnimationChainSave> { new() { Name = "Pasted" } })));

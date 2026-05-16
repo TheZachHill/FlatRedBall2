@@ -378,44 +378,27 @@ public partial class MainWindow : Window
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
 
-        // When an .achx project file is open, make the path relative to it.
-        // When no file exists yet (unsaved project), keep the absolute path so
-        // WireframeControl.DetermineTexturePath can still resolve it for display.
         string relPath = !string.IsNullOrEmpty(_projectManager.FileName)
             ? Path.GetRelativePath(
                 Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
                 texPath).Replace('\\', '/')
             : texPath;
 
-        // When multiple chains are selected, add a distinct frame to each one.
-        // When only one chain is in scope, behave as before and select the new frame.
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
-        AnimationFrameSave? primaryFrame = null;
-        foreach (var chain in chainsToAddTo)
+        if (chainsToAddTo.Count == 1)
         {
-            var frame = new AnimationFrameSave
-            {
-                TextureName        = relPath,
-                LeftCoordinate     = minX / (float)bitmapW,
-                RightCoordinate    = maxX / (float)bitmapW,
-                TopCoordinate      = minY / (float)bitmapH,
-                BottomCoordinate   = maxY / (float)bitmapH,
-                FrameLength        = 0.1f,
-                ShapesSave = new ShapesSave()
-            };
-            chain.Frames.Add(frame);
-            _appCommands.RefreshTreeNode(chain);
-            if (chain == primaryChain)
-                primaryFrame = frame;
+            // AddFrameFromPixelBounds selects the new frame — desired behavior for single-chain.
+            _appCommands.AddFrameFromPixelBounds(primaryChain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
         }
-
-        // In single-chain mode select the new frame (preserves existing UX).
-        // In multi-chain mode leave selection unchanged so the multi-chain view is preserved.
-        if (chainsToAddTo.Count == 1 && primaryFrame != null)
-            _selectedState.SelectedFrame = primaryFrame;
-
-        _events.RaiseAnimationChainsChanged();
+        else
+        {
+            // Multi-chain: add to each chain but preserve the current selection.
+            var priorFrame = _selectedState.SelectedFrame;
+            foreach (var chain in chainsToAddTo)
+                _appCommands.AddFrameFromPixelBounds(chain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
+            _selectedState.SelectedFrame = priorFrame;
+        }
     }
 
     // ── Core event handlers ───────────────────────────────────────────────────
@@ -1082,7 +1065,7 @@ public partial class MainWindow : Window
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
-        var result = TextureDropProcessor.ApplyPngDrop(
+        var (result, relPath) = TextureDropProcessor.ComputePngDrop(
             targetChain,
             targetFrame,
             firstFile,
@@ -1097,25 +1080,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (targetFrame is not null)
+        switch (result)
         {
-            _appCommands.RefreshTreeNode(targetFrame);
-            _selectedState.SelectedFrame = targetFrame;
-        }
-        else if (targetChain is not null)
-        {
-            _appCommands.RefreshTreeNode(targetChain);
+            case TextureDropResult.UpdatedFrame:
+                _appCommands.SetFrameTextureName(targetFrame!, relPath);
+                _appCommands.RefreshTreeNode(targetFrame!);
+                _selectedState.SelectedFrame = targetFrame!;
+                break;
 
-            if (result == TextureDropResult.CreatedFrame)
-            {
-                var createdFrame = targetChain.Frames.LastOrDefault();
+            case TextureDropResult.CreatedFrame:
+                _appCommands.AddFrame(targetChain!, relPath);
+                var createdFrame = targetChain!.Frames.LastOrDefault();
                 if (createdFrame is not null)
                     _selectedState.SelectedFrame = createdFrame;
-            }
-            else
-            {
+                break;
+
+            case TextureDropResult.UpdatedChainFrames:
+                _appCommands.SetAllFramesTextureName(targetChain!, relPath);
+                _appCommands.RefreshTreeNode(targetChain!);
                 _selectedState.SelectedChain = targetChain;
-            }
+                break;
         }
 
         RefreshTextureCombo();
