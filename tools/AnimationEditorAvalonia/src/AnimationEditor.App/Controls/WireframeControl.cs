@@ -15,6 +15,7 @@ using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -1746,6 +1747,24 @@ public class WireframeControl : Control
         }
     }
 
+    /// <summary>
+    /// Adjusts <c>_panX</c>, <c>_panY</c>, and the pending scroll target so that the
+    /// content-space point beneath viewport position (<paramref name="sx"/>, <paramref name="sy"/>)
+    /// stays fixed after a zoom by <paramref name="factor"/>.
+    /// </summary>
+    /// <remarks>
+    /// Post-conditions when a ScrollViewer is attached:
+    /// <list type="bullet">
+    ///   <item><c>_panX ≥ 0</c> — sprite never pushed off the left edge (#319).</item>
+    ///   <item><c>_panX + bitmap.Width × _zoom / 2 ≥ viewport.Width / 2</c> — sprite always
+    ///         pannable to the viewport centre (#341).</item>
+    /// </list>
+    /// The invariant floor is <c>epX = EffectivePaddingX()</c>, which is defined so that
+    /// <c>centreScroll = epX + imgW × zoom / 2 − vpW / 2 ≥ ExtraScrollable &gt; 0</c>.
+    /// Never substitute <c>0</c> as the clamp target — doing so erases the left-side
+    /// padding buffer and makes the sprite centre map to a negative (unreachable) scroll
+    /// offset (see #319 for the off-screen variant and #341 for the locked-centering variant).
+    /// </remarks>
     private void ZoomToward(float sx, float sy, float factor)
     {
         float oldZoom = _zoom;
@@ -1816,6 +1835,20 @@ public class WireframeControl : Control
 
             _panX = rawPanX < minPanX ? epX : rawPanX;
             _panY = rawPanY < minPanY ? epY : rawPanY;
+
+#if DEBUG
+            if (_bitmap != null)
+            {
+                float dbgCentreX = _panX + _bitmap.Width  * _zoom / 2f - (float)vp.Width  / 2f;
+                float dbgCentreY = _panY + _bitmap.Height * _zoom / 2f - (float)vp.Height / 2f;
+                Debug.Assert(dbgCentreX >= 0f,
+                    $"ZoomToward post-cond: centreScrollX={dbgCentreX:F2} < 0 " +
+                    $"(panX={_panX:F1}, imgW={_bitmap.Width}, zoom={_zoom:F3}, vpW={vp.Width:F1})");
+                Debug.Assert(dbgCentreY >= 0f,
+                    $"ZoomToward post-cond: centreScrollY={dbgCentreY:F2} < 0 " +
+                    $"(panY={_panY:F1}, imgH={_bitmap.Height}, zoom={_zoom:F3}, vpH={vp.Height:F1})");
+            }
+#endif
 
             DebugLog("ZOOM_TOWARD",
                 $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +
