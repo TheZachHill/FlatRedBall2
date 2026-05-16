@@ -544,6 +544,19 @@ public class PreviewControl : Control
     }
 
     /// <summary>
+    /// Replaces all guides with the provided world-coordinate values.
+    /// Used to restore guide state from the companion .aeproperties file.
+    /// </summary>
+    internal void SetGuides(IReadOnlyList<float> hGuides, IReadOnlyList<float> vGuides)
+    {
+        _hGuides.Clear();
+        _hGuides.AddRange(hGuides);
+        _vGuides.Clear();
+        _vGuides.AddRange(vGuides);
+        InvalidateVisual();
+    }
+
+    /// <summary>
     /// Formats the coordinate label shown next to a guide while it is being dragged.
     /// Returns <c>"Y: N"</c> for horizontal guides and <c>"X: N"</c> for vertical ones.
     /// </summary>

@@ -25,5 +25,7 @@ namespace AnimationEditor.Core.Data
 
         public bool SnapToGrid { get; set; }
         public int GridSize { get; set; } = 16;
+        public int WireframeZoomPercent { get; set; } = 100;
+        public int PreviewZoomPercent { get; set; } = 100;
     }
 }

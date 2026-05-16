@@ -139,6 +139,34 @@ public class AESettingsSaveRoundTripTests
         Assert.Empty(loaded.ExpandedNodes);
     }
 
+    // ── Zoom fields ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void WireframeZoomPercent_DefaultIs100()
+    {
+        Assert.Equal(100, new AESettingsSave().WireframeZoomPercent);
+    }
+
+    [Fact]
+    public void PreviewZoomPercent_DefaultIs100()
+    {
+        Assert.Equal(100, new AESettingsSave().PreviewZoomPercent);
+    }
+
+    [Fact]
+    public void WireframeZoomPercent_NonDefault_RoundTrip()
+    {
+        var s = new AESettingsSave { WireframeZoomPercent = 200 };
+        Assert.Equal(200, Deserialize(Serialize(s)).WireframeZoomPercent);
+    }
+
+    [Fact]
+    public void PreviewZoomPercent_NonDefault_RoundTrip()
+    {
+        var s = new AESettingsSave { PreviewZoomPercent = 150 };
+        Assert.Equal(150, Deserialize(Serialize(s)).PreviewZoomPercent);
+    }
+
     // ── Combined ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -146,9 +174,11 @@ public class AESettingsSaveRoundTripTests
     {
         var s = new AESettingsSave
         {
-            SnapToGrid  = true,
-            GridSize    = 8,
-            OffsetMultiplier = 2f
+            SnapToGrid           = true,
+            GridSize             = 8,
+            OffsetMultiplier     = 2f,
+            WireframeZoomPercent = 300,
+            PreviewZoomPercent   = 50,
         };
         s.HorizontalGuides.Add(50f);
         s.VerticalGuides.Add(75f);
@@ -157,7 +187,9 @@ public class AESettingsSaveRoundTripTests
         var loaded = Deserialize(Serialize(s));
 
         Assert.True(loaded.SnapToGrid);
-        Assert.Equal(8,  loaded.GridSize);
+        Assert.Equal(8,   loaded.GridSize);
+        Assert.Equal(300, loaded.WireframeZoomPercent);
+        Assert.Equal(50,  loaded.PreviewZoomPercent);
         Assert.Single(loaded.HorizontalGuides);
         Assert.Single(loaded.VerticalGuides);
         Assert.Single(loaded.ExpandedNodes);
