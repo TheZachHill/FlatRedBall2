@@ -61,6 +61,8 @@ namespace AnimationEditor.Core.HotReload
 
         public void RecordOwnSave(string path, long timestampMs)
         {
+            System.Diagnostics.Trace.WriteLine(
+                $"[FileChangeCoalescer] RecordOwnSave: path={path} ts={timestampMs}");
             lock (_lock)
             {
                 _ownSaves[path] = timestampMs;
@@ -103,9 +105,16 @@ namespace AnimationEditor.Core.HotReload
                     if (_ownSaves.TryGetValue(kv.Key, out long saveTs) &&
                         kv.Value.Ts - saveTs < CooldownMs)
                     {
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[FileChangeCoalescer] Discarding own-save bounce: path={kv.Key} " +
+                            $"eventTs={kv.Value.Ts} saveTs={saveTs} delta={kv.Value.Ts - saveTs}ms");
                         ready.Add(kv.Key);
                         continue;
                     }
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[FileChangeCoalescer] Firing event: path={kv.Key} " +
+                        $"type={kv.Value.Type} ownSaveTs={(_ownSaves.TryGetValue(kv.Key, out var st2) ? st2.ToString() : "none")} " +
+                        $"eventTs={kv.Value.Ts} delta={((_ownSaves.TryGetValue(kv.Key, out var st3) ? (kv.Value.Ts - st3).ToString() : "n/a"))}ms");
 
                     ready.Add(kv.Key);
                     result.Add((kv.Key, kv.Value.Type));
