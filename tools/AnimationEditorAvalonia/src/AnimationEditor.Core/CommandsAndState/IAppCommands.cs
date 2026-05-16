@@ -130,6 +130,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void ReloadPngFromDisk(string absolutePngPath);
 
+        /// <summary>
+        /// Synchronizes the hot-reload watcher with the current project state.
+        /// Starts (or restarts) watching PNG directories and (if saved) the .achx file.
+        /// Safe to call for unsaved projects — uses <see cref="string.Empty"/> as achxPath.
+        /// Call after any operation that adds or changes PNG references (drag-drop, Save As).
+        /// </summary>
+        void SyncHotReloadWatcher();
+
         /// <summary>Pastes clipboard chains into the project: renames each to be unique and inserts
         /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>). Undoable.
         /// </summary>

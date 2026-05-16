@@ -42,14 +42,14 @@ namespace AnimationEditor.Core.HotReload
 
             lock (_lock)
             {
-                _achxPath = achxPath;
+                _achxPath = achxPath.Replace('\\', '/');
                 _watchedPngPaths.Clear();
                 foreach (var p in pngPaths)
-                    _watchedPngPaths.Add(p);
+                    _watchedPngPaths.Add(p.Replace('\\', '/'));
 
                 var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                var achxDir = Path.GetDirectoryName(achxPath);
+                var achxDir = Path.GetDirectoryName(_achxPath);
                 if (!string.IsNullOrEmpty(achxDir) && Directory.Exists(achxDir))
                     dirs.Add(achxDir);
 
@@ -71,7 +71,9 @@ namespace AnimationEditor.Core.HotReload
         {
             lock (_lock)
             {
-                var newSet = new HashSet<string>(newPngPaths, StringComparer.OrdinalIgnoreCase);
+                var newSet = new HashSet<string>(
+                    newPngPaths.Select(p => p.Replace('\\', '/')),
+                    StringComparer.OrdinalIgnoreCase);
                 var (added, removed) = ReferencedFileDiff.Diff(_watchedPngPaths, newSet);
 
                 foreach (var p in added)   _watchedPngPaths.Add(p);
@@ -181,23 +183,24 @@ namespace AnimationEditor.Core.HotReload
 
             foreach (var (path, type) in events)
             {
+                var normalizedPath = path.Replace('\\', '/');
                 bool isAchx = achxPath != null &&
-                    string.Equals(path, achxPath, StringComparison.OrdinalIgnoreCase);
-                bool isPng = pngPaths.Contains(path);
+                    string.Equals(normalizedPath, achxPath, StringComparison.OrdinalIgnoreCase);
+                bool isPng = pngPaths.Contains(normalizedPath);
 
                 if (!isAchx && !isPng) continue;
 
                 if (isAchx)
                 {
                     if (type == WatcherChangeType.Deleted)
-                        AchxDeletedOnDisk?.Invoke(path);
+                        AchxDeletedOnDisk?.Invoke(normalizedPath);
                     else
-                        AchxChangedOnDisk?.Invoke(path);
+                        AchxChangedOnDisk?.Invoke(normalizedPath);
                 }
                 else if (isPng)
                 {
                     if (type != WatcherChangeType.Deleted)
-                        PngChangedOnDisk?.Invoke(path);
+                        PngChangedOnDisk?.Invoke(normalizedPath);
                     // PNG deleted: future frames referencing it will just show as missing
                 }
             }

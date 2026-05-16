@@ -1116,6 +1116,7 @@ public partial class MainWindow : Window
         RefreshTextureCombo();
         _appCommands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
+        _appCommands.SyncHotReloadWatcher();  // watch the newly-referenced PNG directory
         e.Handled = true;
     }
 

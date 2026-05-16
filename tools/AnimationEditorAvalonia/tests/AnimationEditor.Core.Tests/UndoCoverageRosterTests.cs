@@ -101,6 +101,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.WireHotReloadWatcher)]    = Category.NonMutating,
         [nameof(IAppCommands.ReloadAchxFromDisk)]      = Category.MutatingNotUndoable,
         [nameof(IAppCommands.ReloadPngFromDisk)]       = Category.NonMutating,
+        [nameof(IAppCommands.SyncHotReloadWatcher)]    = Category.NonMutating,
     };
 
     // ── Reflection guardrails ─────────────────────────────────────────────────

@@ -260,6 +260,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             SaveCurrentAnimationChainList(path);
             _pm.FileName = path;
+            SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
@@ -1066,6 +1067,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.ReloadPngFromDisk"/>
         public void ReloadPngFromDisk(string absolutePngPath) =>
             _events.RaisePngChangedOnDisk(absolutePngPath);
+
+        /// <inheritdoc cref="IAppCommands.SyncHotReloadWatcher"/>
+        public void SyncHotReloadWatcher()
+        {
+            var achxPath = _pm.FileName ?? string.Empty;
+            var achxDir  = !string.IsNullOrEmpty(achxPath)
+                ? System.IO.Path.GetDirectoryName(achxPath) ?? string.Empty
+                : string.Empty;
+            HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir));
+        }
 
         private IEnumerable<string> GetReferencedAbsolutePngPaths(string _, string achxDir)
         {
