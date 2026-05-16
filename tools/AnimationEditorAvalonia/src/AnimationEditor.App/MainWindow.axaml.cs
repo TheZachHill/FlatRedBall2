@@ -1971,6 +1971,7 @@ public partial class MainWindow : Window
             (int)PropPixelX.Value.Value, (int)PropPixelY.Value.Value,
             (int)PropPixelW.Value.Value, (int)PropPixelH.Value.Value,
             bmpW, bmpH);
+        WireframeCtrl.RefreshFrames();
     }
 
 
