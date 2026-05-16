@@ -1542,6 +1542,8 @@ public partial class MainWindow : Window
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
+            AddMenuItem("Rename…", () =>
+                BeginInlineRename(vm!, frame2.HasCustomName ? frame2.Name : string.Empty));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
                 _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
@@ -2426,6 +2428,17 @@ public partial class MainWindow : Window
                     else if (vm.Data is AnimationFrameSave frame)
                         BeginInlineRename(vm, frame.HasCustomName ? frame.Name : string.Empty);
                 }
+                else if (AnimTree.IsKeyboardFocusWithin &&
+                         _selectedState.SelectedFrame is { } fallbackFrame)
+                {
+                    // Avalonia's TreeView can lose SelectedItem after an ObservableCollection
+                    // Move (e.g. ALT+arrow reorder).  Fall back to the selected state to keep
+                    // frame rename working after reorder.
+                    var fallbackVm = TreeBuilder.FindNodeForData(_treeRoots, fallbackFrame);
+                    if (fallbackVm is not null)
+                        BeginInlineRename(fallbackVm,
+                            fallbackFrame.HasCustomName ? fallbackFrame.Name : string.Empty);
+                }
                 else
                     WireframeCtrl.ToggleDebugMode();
             }
@@ -2447,8 +2460,6 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 int delta = e.Key == Key.Up ? -1 : +1;
                 _appCommands.HandleReorder(delta);
-                if (_selectedState.SelectedFrame is { HasCustomName: false })
-                    ShowStatusMessage("Frame labels updated to reflect new positions");
                 if (_selectedState.SelectedFrame is { HasCustomName: false })
                     ShowStatusMessage("Frame labels updated to reflect new positions  ·  F2 to assign a custom name");
             }
