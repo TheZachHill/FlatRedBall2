@@ -1,4 +1,4 @@
-using System.IO;
+using AnimationEditor.Core.Paths;
 
 namespace AnimationEditor.Core;
 
@@ -10,9 +10,10 @@ public static class TitleBarHelper
     /// When <paramref name="filePath"/> is null or empty, returns <c>"AnimationEditor"</c>.
     /// Otherwise returns <c>"AnimationEditor - {filename}"</c> where <c>filename</c> is only
     /// the file name portion of the path (not the full path).
+    /// Uses <see cref="FilePath.NoPath"/> so both forward and back slash paths work cross-platform.
     /// </summary>
     public static string BuildWindowTitle(string? filePath) =>
         string.IsNullOrEmpty(filePath)
             ? "AnimationEditor"
-            : $"AnimationEditor - {Path.GetFileName(filePath)}";
+            : $"AnimationEditor - {new FilePath(filePath).NoPath}";
 }
