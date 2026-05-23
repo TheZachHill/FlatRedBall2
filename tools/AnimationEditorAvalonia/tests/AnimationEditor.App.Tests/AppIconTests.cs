@@ -47,4 +47,16 @@ public class AppIconTests
             window.Close();
         }
     }
+
+    /// <summary>
+    /// MacOSDockIcon.Set must not throw when given a non-existent path (defensive guard
+    /// against missing icon at runtime on non-macOS platforms or missing .icns builds).
+    /// </summary>
+    [Fact]
+    public void MacOSDockIcon_DoesNotThrowForMissingFile()
+    {
+        var exception = Record.Exception(() =>
+            MacOSDockIcon.Set("/nonexistent/AppIcon.icns"));
+        Assert.Null(exception);
+    }
 }

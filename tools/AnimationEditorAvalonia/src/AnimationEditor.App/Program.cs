@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using System.IO;
 
 namespace AnimationEditor.App;
 
@@ -16,6 +17,8 @@ class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .AfterSetup(_ => MacOSDockIcon.Set(
+                Path.Combine(AppContext.BaseDirectory, "AppIcon.icns")))
 #if DEBUG
             .WithDeveloperTools()
 #endif
