@@ -6,6 +6,12 @@ namespace AnimationEditor.Core.Tests;
 public sealed class TitleBarHelperTests
 {
     [Fact]
+    public void AppName_IsBrandedName()
+    {
+        Assert.Equal("FlatRedBall Animation Editor", TitleBarHelper.AppName);
+    }
+
+    [Fact]
     public void BuildWindowTitle_WhenNoFile_ReturnsAppNameOnly()
     {
         Assert.Equal("AnimationEditor", TitleBarHelper.BuildWindowTitle(null));
