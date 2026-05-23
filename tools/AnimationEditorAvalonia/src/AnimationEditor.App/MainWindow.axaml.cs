@@ -786,6 +786,10 @@ public partial class MainWindow : Window
         MenuShowHistory.IsEnabled = false;
 
         RefreshRecentFiles();
+
+        // On macOS the menus live in the system menu bar (NativeMenu); hide the duplicate in-window copy.
+        if (OperatingSystem.IsMacOS())
+            MainMenu.IsVisible = false;
     }
 
     /// <summary>
