@@ -13,6 +13,16 @@
     <AvaloniaResource Include="Assets\icons\**" />
   </ItemGroup>
 
+  <!-- macOS app bundle icon: .icns is copied next to the binary and referenced by CFBundleIconFile. -->
+  <ItemGroup>
+    <Content Include="Assets\icons\AppIcon.icns" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- CFBundleIconFile tells the macOS runtime which .icns to use for the Dock and Finder. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('osx'))">
+    <CFBundleIconFile>AppIcon</CFBundleIconFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.1" />
     <PackageReference Include="Avalonia.Desktop" Version="12.0.1" />
