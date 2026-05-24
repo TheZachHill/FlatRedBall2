@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private TabEntry? _dragTab;
     private double _dragStartX;
     private bool _isDragging;
+    private Border? _ghostBorder;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
     private bool _suppressZoomComboChanged;
@@ -244,7 +245,36 @@ public partial class MainWindow : Window
                 {
                     _isDragging = true;
                     tabBorder.Cursor = new Cursor(StandardCursorType.DragMove);
-                    tabBorder.Opacity = 0.65;
+                    tabBorder.Opacity = 0.4;
+
+                    // Create a floating ghost label that follows the pointer
+                    _ghostBorder = new Border
+                    {
+                        Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3a4150")),
+                        BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#4a90d9")),
+                        BorderThickness = new Avalonia.Thickness(1),
+                        CornerRadius = new Avalonia.CornerRadius(3),
+                        Padding = new Avalonia.Thickness(10, 5),
+                        Opacity = 0.92,
+                        IsHitTestVisible = false,
+                        Child = new TextBlock
+                        {
+                            Text = captured.DisplayName,
+                            FontSize = 11,
+                            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d4d8de")),
+                        },
+                    };
+                    var initPos = args.GetPosition(DragOverlayCanvas);
+                    Canvas.SetLeft(_ghostBorder, initPos.X + 10);
+                    Canvas.SetTop(_ghostBorder, initPos.Y - 18);
+                    DragOverlayCanvas.Children.Add(_ghostBorder);
+                }
+
+                if (_isDragging && _ghostBorder != null)
+                {
+                    var pos = args.GetPosition(DragOverlayCanvas);
+                    Canvas.SetLeft(_ghostBorder, pos.X + 10);
+                    Canvas.SetTop(_ghostBorder, pos.Y - 18);
                 }
             };
 
@@ -265,6 +295,13 @@ public partial class MainWindow : Window
                 args.Pointer.Capture(null);
                 tabBorder.Cursor = new Cursor(StandardCursorType.Hand);
                 tabBorder.Opacity = 1.0;
+
+                // Remove ghost overlay
+                if (_ghostBorder != null)
+                {
+                    DragOverlayCanvas.Children.Remove(_ghostBorder);
+                    _ghostBorder = null;
+                }
 
                 if (_isDragging)
                 {
