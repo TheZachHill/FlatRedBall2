@@ -170,6 +170,24 @@ namespace AnimationEditor.Core.Models
             _tabs.Insert(target, tab);
         }
 
+        /// <summary>
+        /// Replaces the tab for <paramref name="oldPath"/> with a new entry at the same
+        /// position using <paramref name="newPath"/>. If the tab was active it remains so.
+        /// No-op if <paramref name="oldPath"/> is not tracked.
+        /// Does not raise <see cref="ActiveChanged"/> (the active tab identity may have changed
+        /// but the user experience is a simple rename — callers should rebuild the strip).
+        /// </summary>
+        public void Rename(FilePath oldPath, FilePath newPath)
+        {
+            var tab = FindTab(oldPath);
+            if (tab == null) return;
+            int idx = _tabs.IndexOf(tab);
+            var replacement = new TabEntry(newPath);
+            _tabs[idx] = replacement;
+            if (ActiveTab == tab)
+                ActiveTab = replacement;
+        }
+
         // ── Private helpers ───────────────────────────────────────────────────
 
         private TabEntry? FindTab(FilePath path) =>

@@ -594,4 +594,67 @@ public class TabManagerTests
 
         Assert.Equal(P(@"C:\c.achx"), tm.ActiveTab!.Path);
     }
+
+    // ── Rename ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Rename_UpdatesTabPath()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\projects\hero.achx"));
+
+        Assert.Equal(P(@"C:\projects\hero.achx"), tm.Tabs[0].Path);
+    }
+
+    [Fact]
+    public void Rename_DisplayNameBecomesFilename()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\projects\hero.achx"));
+
+        Assert.Equal("hero.achx", tm.Tabs[0].DisplayName);
+    }
+
+    [Fact]
+    public void Rename_PreservesTabPosition()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P(@"C:\a.achx"));
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+        tm.OpenOrFocus(P(@"C:\c.achx"));
+        tm.Activate(P("__untitled__:1"));
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\b.achx"));
+
+        Assert.Equal("a.achx", tm.Tabs[0].Path.NoPath);
+        Assert.Equal("b.achx", tm.Tabs[1].Path.NoPath);
+        Assert.Equal("c.achx", tm.Tabs[2].Path.NoPath);
+    }
+
+    [Fact]
+    public void Rename_ActiveTabRemainsActive()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P("__untitled__:1"), "Untitled");
+
+        tm.Rename(P("__untitled__:1"), P(@"C:\hero.achx"));
+
+        Assert.Equal(P(@"C:\hero.achx"), tm.ActiveTab!.Path);
+    }
+
+    [Fact]
+    public void Rename_UnknownPath_IsNoOp()
+    {
+        var tm = new TabManager();
+        tm.OpenOrFocus(P(@"C:\a.achx"));
+
+        tm.Rename(P(@"C:\nonexistent.achx"), P(@"C:\b.achx")); // must not throw
+
+        Assert.Single(tm.Tabs);
+        Assert.Equal("a.achx", tm.Tabs[0].Path.NoPath);
+    }
 }

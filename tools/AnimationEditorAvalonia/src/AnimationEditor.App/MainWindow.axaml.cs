@@ -480,6 +480,14 @@ public partial class MainWindow : Window
             RefreshRecentFiles();
             UpdateTitle();
             UpdateStatusBar();
+
+            // If the active tab was an Untitled sentinel, promote it to the real file path.
+            var active = _tabManager.ActiveTab;
+            if (active != null && IsUntitledTab(active))
+            {
+                _tabManager.Rename(active.Path, new FilePath(path));
+                RebuildTabStrip();
+            }
         });
         _events.AvailableTexturesChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshTextureCombo);
 
