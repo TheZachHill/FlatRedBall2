@@ -30,9 +30,6 @@
     <GumProjectDir>$(SolitaireCommonDir)Content\GumProject\</GumProjectDir>
     <GumProjectFile>$(GumProjectDir)GumProject.gumx</GumProjectFile>
     <GumPackageFile>$(GumProjectDir)GumProject.gumpkg</GumPackageFile>
-
-    <!-- gumcli lives in the sibling Gum repo. Override on the command line if it lives elsewhere. -->
-    <GumCliPath Condition="'$(GumCliPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\Gum\Tools\Gum.Cli\bin\Debug\net8.0\gumcli.exe</GumCliPath>
   </PropertyGroup>
 
   <!--
@@ -52,10 +49,15 @@
           Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' == 'Solitaire.Common'"
           Inputs="@(GumPackInputs)"
           Outputs="$(GumPackageFile)">
-    <Error Condition="!Exists('$(GumCliPath)')"
-           Text="gumcli.exe not found at '$(GumCliPath)'. Build Gum/Tools/Gum.Cli (Debug, net8.0) or pass -p:GumCliPath=&lt;path&gt;." />
+    <!--
+      gumcli is the published GumCli .NET tool, pinned in Solitaire.Common/.config/
+      dotnet-tools.json to match the Gum NuGet version (so the .gumpkg format matches
+      the runtime). restore is idempotent; this target only runs when the Gum project
+      changed (Inputs/Outputs), so the restore cost is incurred only then.
+    -->
     <Message Importance="high" Text="Packing Gum project: $(GumProjectFile) -> $(GumPackageFile)" />
-    <Exec Command="&quot;$(GumCliPath)&quot; pack &quot;$(GumProjectFile)&quot; -o &quot;$(GumPackageFile)&quot;"
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(SolitaireCommonDir)" />
+    <Exec Command="dotnet gumcli pack &quot;$(GumProjectFile)&quot; -o &quot;$(GumPackageFile)&quot;"
           WorkingDirectory="$(SolitaireCommonDir)" />
   </Target>
 </Project>
