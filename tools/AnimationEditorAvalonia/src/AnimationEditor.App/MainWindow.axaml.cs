@@ -2466,10 +2466,16 @@ public partial class MainWindow : Window
         PropFrameLen.ValueChanged  += (_, _) => ApplyFrameLen();
         PropRelX.ValueChanged      += (_, _) => ApplyFrameRelative();
         PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
-        PropRed.ValueChanged       += (_, _) => ApplyFrameColor();
-        PropGreen.ValueChanged     += (_, _) => ApplyFrameColor();
-        PropBlue.ValueChanged      += (_, _) => ApplyFrameColor();
-        PropAlpha.ValueChanged     += (_, _) => ApplyFrameAlpha();
+        // Color/alpha channels commit one undo entry on edit completion (focus loss / Enter), not
+        // per keystroke — NumericUpDown raises ValueChanged on every keypress while typing (#445).
+        PropRed.LostFocus          += (_, _) => ApplyFrameColor();
+        PropGreen.LostFocus        += (_, _) => ApplyFrameColor();
+        PropBlue.LostFocus         += (_, _) => ApplyFrameColor();
+        PropAlpha.LostFocus        += (_, _) => ApplyFrameAlpha();
+        PropRed.KeyDown            += (_, e) => CommitColorChannelOnEnter(e);
+        PropGreen.KeyDown          += (_, e) => CommitColorChannelOnEnter(e);
+        PropBlue.KeyDown           += (_, e) => CommitColorChannelOnEnter(e);
+        PropAlpha.KeyDown          += (_, e) => { if (e.Key == Key.Enter) ApplyFrameAlpha(); };
         PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
         PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
@@ -2759,6 +2765,11 @@ public partial class MainWindow : Window
         // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
         static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
         _appCommands.SetFrameColor(frame, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
+    }
+
+    private void CommitColorChannelOnEnter(KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) ApplyFrameColor();
     }
 
     private void ApplyFrameAlpha()

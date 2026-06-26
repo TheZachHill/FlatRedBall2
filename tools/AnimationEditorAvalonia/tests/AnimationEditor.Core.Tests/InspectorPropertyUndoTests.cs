@@ -19,7 +19,8 @@ public class InspectorPropertyUndoTests
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetFrameAlpha(frame, 128);
-        Assert.True(ctx.UndoManager.CanUndo);
+        // A single committed edit must record exactly one undo entry (not one per keystroke — #445).
+        Assert.Single(ctx.UndoManager.UndoHistory);
         Assert.Equal(128, frame.Alpha);
 
         ctx.UndoManager.Undo();
