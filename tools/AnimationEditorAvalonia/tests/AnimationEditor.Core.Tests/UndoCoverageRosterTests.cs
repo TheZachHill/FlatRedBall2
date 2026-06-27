@@ -74,6 +74,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveFrameToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrameToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipFrameHorizontally)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipFrameVertically)]          = Category.MutatingUndoable,
@@ -222,6 +224,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveFrameToBottom(Zebra(ctx).Frames[0], Zebra(ctx))));
         yield return Row(nameof(IAppCommands.MoveShape),
             ctx => Sync(() => ctx.AppCommands.MoveShape(Rect(ctx), Zebra(ctx).Frames[0], +1)));
+        yield return Row(nameof(IAppCommands.MoveShapeToTop),
+            ctx => Sync(() => ctx.AppCommands.MoveShapeToTop(Circle(ctx), Zebra(ctx).Frames[0]))); // Circle is not already first
+        yield return Row(nameof(IAppCommands.MoveShapeToBottom),
+            ctx => Sync(() => ctx.AppCommands.MoveShapeToBottom(Rect(ctx), Zebra(ctx).Frames[0]))); // Rect is not already last
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
         yield return Row(nameof(IAppCommands.FlipFrameHorizontally),
