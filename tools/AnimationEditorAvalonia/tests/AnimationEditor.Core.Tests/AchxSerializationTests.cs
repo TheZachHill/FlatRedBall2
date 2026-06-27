@@ -219,8 +219,11 @@ public class AchxSerializationTests
     }
 
     [Fact]
-    public void Save_FrameWithEmptyShapes_OmitsShapeCollectionElement()
+    public void Save_FrameWithEmptyNonNullShapes_WritesEmptyWrapper()
     {
+        // Presence is preserved: a non-null (but empty) ShapesSave means the source frame had a
+        // <ShapeCollectionSave> element, so re-save must keep it. Some FRB1 files write an empty
+        // wrapper for shapeless frames; dropping it would diff those files. Null is the omit case.
         var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/emptyshapes.achx";
@@ -232,7 +235,24 @@ public class AchxSerializationTests
         acls.Save(path);
         var xml = File.ReadAllText(path);
 
-        Assert.DoesNotContain("ShapeCollectionSave", xml);
+        Assert.Contains("<ShapeCollectionSave>", xml);
+        Assert.Contains("<CircleSaves />", xml); // empty typed lists, no shape entries
+    }
+
+    [Fact]
+    public void LoadThenSave_Frb1FileWithShapes_IsByteIdentical()
+    {
+        // Real FRB1-authored .achx (16 chains, 40 frames, per-frame CircleSave shapes with
+        // Z/Alpha/Red/Green/Blue). Opening and re-saving must reproduce the file byte-for-byte:
+        // FRB1's typed shape lists, element order, float text (9-digit fallback), no BOM.
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Frb1WeaponAnimations.achx");
+        var outPath = dir.Path + "/out.achx";
+
+        AnimationChainListSave.FromFile(fixturePath).Save(outPath);
+
+        Assert.Equal(File.ReadAllBytes(fixturePath), File.ReadAllBytes(outPath));
     }
 
     [Fact]
