@@ -568,13 +568,13 @@ public partial class MainWindow : Window
         _events.AnimationChainsChanged    += HandleAnimationChainsChanged;
         _selectedState.SelectionChanged   += HandleSelectionChanged;
 
-        _appCommands.FramesDeleted += label =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowFrameDeletedToast(label));
+        _appCommands.ItemsDeleted += label =>
+            Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
 
-        FrameDeletedToastUndoBtn.Click += (_, _) =>
+        ItemDeletedToastUndoBtn.Click += (_, _) =>
         {
             _toastCts?.Cancel();
-            FrameDeletedToastPanel.IsVisible = false;
+            ItemDeletedToastPanel.IsVisible = false;
             _undoManager.Undo();
         };
 
@@ -1248,6 +1248,7 @@ public partial class MainWindow : Window
         MenuAbout.Click  += OnAboutClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
+        MenuDuplicate.Click     += (_, _) => HandleDuplicate();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
         MenuReloadFromDisk.Click += (_, _) =>
@@ -1309,6 +1310,7 @@ public partial class MainWindow : Window
         Redo:            () => _undoManager.Redo(),
         Copy:            () => _ = HandleCopyAsync(),
         Paste:           () => _ = HandlePasteAsync(),
+        Duplicate:       () => HandleDuplicate(),
         ReloadFromDisk:  () => { if (!string.IsNullOrEmpty(_projectManager.FileName)) _appCommands.ReloadAchxFromDisk(_projectManager.FileName); },
         ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
         ResizeTexture:   () => _ = DoResizeTextureAsync(),
@@ -2309,12 +2311,20 @@ public partial class MainWindow : Window
                 }
             });
             AddMenuItem("Delete Rectangle", () =>
-                _ = _appCommands.AskToDeleteRectangles(new() { rect }));
+            {
+                var frame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (frame is not null)
+                    _appCommands.DeleteShapes(frame, new() { rect }, new());
+            });
         }
         else if (vm?.Data is CircleSave circle)
         {
             AddMenuItem("Delete Circle", () =>
-                _ = _appCommands.AskToDeleteCircles(new() { circle }));
+            {
+                var frame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (frame is not null)
+                    _appCommands.DeleteShapes(frame, new(), new() { circle });
+            });
         }
         else if (vm?.Data is AnimationFrameSave frame2)
         {
@@ -2335,13 +2345,12 @@ public partial class MainWindow : Window
             AddSeparator();
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
+            if (chain2 is not null)
+                AddMenuItem("Duplicate", () => _appCommands.DuplicateFrame(frame2, chain2));
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddMenuItem("Rename…", () =>
                 BeginInlineRename(vm!, frame2.HasCustomName ? frame2.Name : string.Empty));
-            AddSeparator();
-            if (chain2 is not null)
-                AddMenuItem("Duplicate Frame", () => _appCommands.DuplicateFrame(frame2, chain2));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
                 _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
@@ -2369,23 +2378,18 @@ public partial class MainWindow : Window
             AddMenuItem("Add Frame",          () => _appCommands.AddFrame(chain));
             AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
             AddSeparator();
-            AddMenuItem("Duplicate (original)",         () => _appCommands.DuplicateChain(chain));
-            AddMenuItem("Duplicate (flip horizontally)",() => _appCommands.DuplicateChain(chain, flipH: true));
-            AddMenuItem("Duplicate (flip vertically)",  () => _appCommands.DuplicateChain(chain, flipV: true));
-            AddSeparator();
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
+            AddSubMenu("Duplicate",
+                ("Original",        () => _appCommands.DuplicateChain(chain)),
+                ("Flip Horizontal", () => _appCommands.DuplicateChain(chain, flipH: true)),
+                ("Flip Vertical",   () => _appCommands.DuplicateChain(chain, flipV: true)));
             AddSeparator();
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
             AddMenuItem("Delete Animation", () =>
-            {
-                if (chain.Frames.Count > 0)
-                    ShowDeleteChainConfirm(chain);
-                else
-                    _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain });
-            });
+                _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain }));
         }
         else
         {
@@ -2411,6 +2415,18 @@ public partial class MainWindow : Window
 
     private void AddSeparator() =>
         AnimTree.ContextMenu!.Items.Add(new Separator());
+
+    private void AddSubMenu(string header, params (string Header, Action OnClick)[] children)
+    {
+        var parent = new MenuItem { Header = header };
+        foreach (var (childHeader, onClick) in children)
+        {
+            var child = new MenuItem { Header = childHeader };
+            child.Click += (_, _) => onClick();
+            parent.Items.Add(child);
+        }
+        AnimTree.ContextMenu!.Items.Add(parent);
+    }
 
     private void AskAdjustFrameTime(AnimationChainSave chain)
     {
@@ -3253,76 +3269,6 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds a danger-styled delete confirmation dialog. ENTER confirms (Delete), ESC cancels,
-    /// and closing by any other means resolves <paramref name="tcs"/> to false.
-    /// </summary>
-    internal static Window BuildDeleteConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            SizeToContent = SizeToContent.Height,
-            CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(20, 16, 20, 16), Spacing = 8 };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            FontSize = 13,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = "This action cannot be undone.",
-            FontSize = 11,
-            Foreground = ThemedBrush("InkMid")
-        });
-
-        var deleteBtn = new Button
-        {
-            Content = "Delete",
-            Background = ThemedBrush("Accent"),
-            Foreground = Avalonia.Media.Brushes.White,
-            Padding = new Avalonia.Thickness(16, 6)
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-            Padding = new Avalonia.Thickness(16, 6)
-        };
-
-        deleteBtn.Click += (_, _) => { tcs.TrySetResult(true);  dialog.Close(); };
-        cancelBtn.Click += (_, _) => { tcs.TrySetResult(false); dialog.Close(); };
-
-        var buttons = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Margin = new Avalonia.Thickness(0, 4, 0, 0)
-        };
-        buttons.Children.Add(cancelBtn);
-        buttons.Children.Add(deleteBtn);
-        panel.Children.Add(buttons);
-
-        dialog.Content = panel;
-        dialog.Closed += (_, _) => tcs.TrySetResult(false);
-
-        WireDialogKeyboard(dialog,
-            onConfirm: () => { tcs.TrySetResult(true);  dialog.Close(); },
-            onCancel:  () => { tcs.TrySetResult(false); dialog.Close(); });
-
-        // Ensure ENTER confirms (Delete) by focusing the delete button last — it overrides
-        // WireDialogKeyboard's Opened handler which would otherwise land on Cancel (first child).
-        dialog.Opened += (_, _) => deleteBtn.Focus();
-
-        return dialog;
-    }
-
-    /// <summary>
     /// Wires ENTER → <paramref name="onConfirm"/> and ESC → <paramref name="onCancel"/>
     /// on a modal dialog. The handler is attached at the window with
     /// <c>handledEventsToo: true</c> so it still fires when a focused input control
@@ -3488,6 +3434,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 _ = HandlePasteAsync();
             }
+            else if (e.Key == Key.D && HasCommandModifier(e.KeyModifiers))
+            {
+                if (IsTextInputFocused()) return;
+                e.Handled = true;
+                HandleDuplicate();
+            }
             else if (e.Key == Key.Delete)
             {
                 if (IsTextInputFocused()) return;
@@ -3560,29 +3512,57 @@ public partial class MainWindow : Window
 
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
-    private async Task HandleCopyAsync()
+    // The selected domain object, resolved from the selection model (the source of
+    // truth) with the tree node as a fast path. AnimTree.SelectedItem alone is null
+    // whenever the selected node isn't realized — e.g. a frame is selected while its
+    // chain row is collapsed — even though _selectedState still holds it. Mirrors the
+    // shape→frame→chain priority in SyncTreeSelection.
+    private object? SelectedData =>
+        (AnimTree.SelectedItem as TreeNodeVm)?.Data
+        ?? (object?)_selectedState.SelectedCircle
+        ?? _selectedState.SelectedRectangle
+        ?? _selectedState.SelectedFrame
+        ?? (object?)_selectedState.SelectedChain;
+
+    // Copy/Paste are invoked fire-and-forget (_ = HandleCopyAsync()), so an exception
+    // inside them would otherwise vanish as an unobserved task exception — which is how
+    // a clipboard-serialization failure silently produced "nothing happened". Route both
+    // through this guard so any failure surfaces as a visible error instead.
+    internal async Task RunGuardedAsync(Func<Task> action, string actionName)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ {actionName} failed: {ex.Message}", isError: true);
+        }
+    }
+
+    private Task HandleCopyAsync()  => RunGuardedAsync(HandleCopyCoreAsync,  "Copy");
+    private Task HandlePasteAsync() => RunGuardedAsync(HandlePasteCoreAsync, "Paste");
+
+    private async Task HandleCopyCoreAsync()
     {
         if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
-        string? xml = null;
-
-        var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
-        if (selectedVm?.Data is AnimationChainSave chainToCopy)
-            xml = ClipboardPayload.Serialize(new List<AnimationChainSave> { chainToCopy });
-        else if (selectedVm?.Data is AnimationFrameSave frameToCopy)
-            xml = ClipboardPayload.Serialize(new List<AnimationFrameSave> { frameToCopy });
-        else if (selectedVm?.Data is AARectSave rectToCopy)
-            xml = ClipboardPayload.Serialize(rectToCopy);
-        else if (selectedVm?.Data is CircleSave circleToCopy)
-            xml = ClipboardPayload.Serialize(circleToCopy);
+        string? xml = SelectedData switch
+        {
+            AnimationChainSave chainToCopy => ClipboardPayload.Serialize(new List<AnimationChainSave> { chainToCopy }),
+            AnimationFrameSave frameToCopy => ClipboardPayload.Serialize(new List<AnimationFrameSave> { frameToCopy }),
+            AARectSave rectToCopy          => ClipboardPayload.Serialize(rectToCopy),
+            CircleSave circleToCopy        => ClipboardPayload.Serialize(circleToCopy),
+            _ => null,
+        };
 
         if (xml is not null)
             await clipboard.SetTextAsync(xml);
     }
 
-    private async Task HandlePasteAsync()
+    private async Task HandlePasteCoreAsync()
     {
         if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -3598,7 +3578,7 @@ public partial class MainWindow : Window
         var acls = _projectManager.AnimationChainListSave;
         if (acls is null) return;
 
-        var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
+        var selectedData = SelectedData;
 
         // Each branch hands the mutation to an undoable command via _appCommands;
         // the read-side prep (target resolution, ShapesSave init, name uniquing)
@@ -3611,8 +3591,8 @@ public partial class MainWindow : Window
         else if (frames is { Count: > 0 })
         {
             AnimationChainSave? targetChain = null;
-            if (selectedVm?.Data is AnimationChainSave c) targetChain = c;
-            else if (selectedVm?.Data is AnimationFrameSave f)
+            if (selectedData is AnimationChainSave c) targetChain = c;
+            else if (selectedData is AnimationFrameSave f)
                 targetChain = _objectFinder.GetAnimationChainContaining(f);
 
             if (targetChain is null && acls.AnimationChains.Count > 0)
@@ -3656,95 +3636,89 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Duplicate ─────────────────────────────────────────────────────────────
+
+    // Mirrors HandleCopyAsync's selection dispatch exactly (chain/frame/rect/circle) so
+    // every type that can be copied can also be duplicated. Each duplicate places the copy
+    // adjacent to its source and selects it; flip-H/flip-V chain variants stay menu-only.
+    private void HandleDuplicate()
+    {
+        if (IsTextInputFocused()) return;
+
+        switch (SelectedData)
+        {
+            case AnimationChainSave chain:
+                _appCommands.DuplicateChain(chain);
+                break;
+            case AnimationFrameSave frame
+                when _objectFinder.GetAnimationChainContaining(frame) is { } chain:
+                _appCommands.DuplicateFrame(frame, chain);
+                break;
+            case AARectSave rect:
+                _appCommands.DuplicateShape(rect);
+                break;
+            case CircleSave circle:
+                _appCommands.DuplicateShape(circle);
+                break;
+        }
+    }
+
     // ── Delete ────────────────────────────────────────────────────────────────
 
     private void HandleDelete()
     {
-        var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
-        if (selectedVm is null) return;
-
         // Delete the whole multi-selection of the focused node's kind, not just the
-        // focused node — AskToDelete* batches them into a single undo step.
-        if (selectedVm.Data is AnimationChainSave chainToDel)
+        // focused node — the delete commands batch them into a single undo step.
+        // All kinds are fully undoable, so they delete immediately and surface an
+        // undo toast rather than a confirmation dialog.
+        switch (SelectedData)
         {
-            var chains = _selectedState.SelectedChains;
-            List<AnimationChainSave> toDelete = chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel };
-            if (toDelete.Any(c => c.Frames.Count > 0))
-                ShowDeleteChainConfirm(toDelete);
-            else
-                _appCommands.DeleteAnimationChains(toDelete);
-        }
-        else if (selectedVm.Data is AnimationFrameSave frameToDel)
-        {
-            var frames = _selectedState.SelectedFrames;
-            _appCommands.DeleteFrames(frames.Count > 0 ? frames : new() { frameToDel });
-        }
-        else if (selectedVm.Data is AARectSave rectToDel)
-        {
-            var frame   = _selectedState.SelectedFrame!;
-            var rects   = _selectedState.SelectedRectangles;
-            var circles = _selectedState.SelectedCircles;
-            ShowDeleteShapeConfirm(
-                frame,
-                rects.Count > 0 ? rects : new() { rectToDel },
-                circles);
-        }
-        else if (selectedVm.Data is CircleSave circleToDel)
-        {
-            var frame   = _selectedState.SelectedFrame!;
-            var circles = _selectedState.SelectedCircles;
-            var rects   = _selectedState.SelectedRectangles;
-            ShowDeleteShapeConfirm(
-                frame,
-                rects,
-                circles.Count > 0 ? circles : new() { circleToDel });
+            case AnimationChainSave chainToDel:
+            {
+                var chains = _selectedState.SelectedChains;
+                _appCommands.DeleteAnimationChains(chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel });
+                break;
+            }
+            case AnimationFrameSave frameToDel:
+            {
+                var frames = _selectedState.SelectedFrames;
+                _appCommands.DeleteFrames(frames.Count > 0 ? frames : new() { frameToDel });
+                break;
+            }
+            case AARectSave rectToDel:
+            {
+                var frame   = _selectedState.SelectedFrame!;
+                var rects   = _selectedState.SelectedRectangles;
+                var circles = _selectedState.SelectedCircles;
+                _appCommands.DeleteShapes(frame, rects.Count > 0 ? rects : new() { rectToDel }, circles);
+                break;
+            }
+            case CircleSave circleToDel:
+            {
+                var frame   = _selectedState.SelectedFrame!;
+                var circles = _selectedState.SelectedCircles;
+                var rects   = _selectedState.SelectedRectangles;
+                _appCommands.DeleteShapes(frame, rects, circles.Count > 0 ? circles : new() { circleToDel });
+                break;
+            }
         }
     }
 
-    private async void ShowFrameDeletedToast(string label)
+    private async void ShowItemDeletedToast(string label)
     {
         _toastCts?.Cancel();
         _toastCts = new System.Threading.CancellationTokenSource();
         System.Threading.CancellationToken token = _toastCts.Token;
 
-        FrameDeletedToastLabel.Text = $"\"{label}\" deleted";
-        FrameDeletedToastPanel.IsVisible = true;
+        ItemDeletedToastLabel.Text = $"\"{label}\" deleted";
+        ItemDeletedToastPanel.IsVisible = true;
 
         try
         {
             await System.Threading.Tasks.Task.Delay(4000, token);
-            FrameDeletedToastPanel.IsVisible = false;
+            ItemDeletedToastPanel.IsVisible = false;
         }
         catch (System.Threading.Tasks.TaskCanceledException) { }
-    }
-
-    private void ShowDeleteChainConfirm(AnimationChainSave chain) =>
-        ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
-
-    private async void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
-    {
-        string msg = chains.Count == 1
-            ? $"Delete animation \"{chains[0].Name}\"? It has {chains[0].Frames.Count} frame(s)."
-            : $"Delete {chains.Count} animations?";
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = BuildDeleteConfirmDialog(msg, "Delete Animation", tcs);
-        await dialog.ShowDialog(this);
-        if (await tcs.Task)
-            _appCommands.DeleteAnimationChains(chains);
-    }
-
-    private async void ShowDeleteShapeConfirm(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles)
-    {
-        int total = rects.Count + circles.Count;
-        string name = rects.Count > 0 ? rects[0].Name : circles[0].Name;
-        string msg = total == 1
-            ? $"Delete shape \"{name}\"?"
-            : $"Delete {total} shape(s)?";
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = BuildDeleteConfirmDialog(msg, "Delete Shape", tcs);
-        await dialog.ShowDialog(this);
-        if (await tcs.Task)
-            _appCommands.DeleteShapes(frame, rects, circles);
     }
 
     /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>

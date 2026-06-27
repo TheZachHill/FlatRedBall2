@@ -35,7 +35,12 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action RefreshAnimationFrameDisplayRequested;
         event Action RefreshWireframeRequested;
         event Action<string>? SaveAsCompleted;
-        event Action<string>? FramesDeleted;
+
+        /// <summary>
+        /// Raised after a frame, shape, or animation chain is deleted, carrying a short
+        /// label for the deleted item(s). The app layer shows an undo toast in response.
+        /// </summary>
+        event Action<string>? ItemsDeleted;
 
         /// <summary>
         /// Fired when <see cref="LoadAnimationChain"/> fails — file not found, corrupt XML,
@@ -80,11 +85,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame);
         void DeleteCircle(CircleSave circle, AnimationFrameSave owner);
         void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
-        Task AskToDeleteRectangles(List<AARectSave> rectangles);
-        Task AskToDeleteCircles(List<CircleSave> circles);
-        Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles);
         void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles);
-        Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains);
         void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
@@ -115,6 +116,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// and attached shapes are copied. Undoable.
         /// </summary>
         AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain);
+
+        /// <summary>
+        /// Deep-copies a shape (<see cref="AARectSave"/> or <see cref="CircleSave"/>) into the
+        /// frame that contains it, with a unique name, and selects the copy. Returns the copy,
+        /// or <c>null</c> if the shape isn't in any frame or its kind isn't duplicable. Undoable.
+        /// </summary>
+        object? DuplicateShape(object source);
         void SortAnimationsAlphabetically();
         void AdjustOffsetsJustifyBottom(AnimationChainSave chain, Func<AnimationFrameSave, float?> getTextureHeight, float offsetMultiplier = 1f);
         void AdjustOffsetsAdjustAll(AnimationChainSave chain, float? deltaX, float? deltaY, bool relative);
