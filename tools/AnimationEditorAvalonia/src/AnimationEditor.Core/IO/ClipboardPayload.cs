@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.IO;
@@ -61,12 +62,12 @@ public static class ClipboardPayload
         {
             if (typeName == TypeName<List<AnimationChainSave>>())
             {
-                chains = XmlFile.DeserializeFromString<List<AnimationChainSave>>(xml);
+                chains = XmlFile.DeserializeFromString<List<AnimationChainSave>>(xml, ShapeTypes);
                 return chains != null;
             }
             if (typeName == TypeName<List<AnimationFrameSave>>())
             {
-                frames = XmlFile.DeserializeFromString<List<AnimationFrameSave>>(xml);
+                frames = XmlFile.DeserializeFromString<List<AnimationFrameSave>>(xml, ShapeTypes);
                 return frames != null;
             }
             if (typeName == nameof(AARectSave))
@@ -90,9 +91,15 @@ public static class ClipboardPayload
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
+    // ShapesSave.Shapes is List<object> holding these concrete shape types; the
+    // XmlSerializer must be told about them or it throws when a frame/chain that
+    // contains a shape is copied.
+    private static readonly Type[] ShapeTypes =
+        { typeof(AARectSave), typeof(CircleSave), typeof(PolygonSave) };
+
     private static string Encode<T>(T obj)
     {
-        XmlFile.SerializeToString(obj, out string xml);
+        XmlFile.SerializeToString(obj, out string xml, ShapeTypes);
         return $"{TypeName<T>()}:{xml}";
     }
 
