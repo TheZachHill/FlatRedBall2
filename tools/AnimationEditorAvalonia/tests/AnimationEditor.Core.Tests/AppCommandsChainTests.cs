@@ -441,6 +441,22 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_WithFlipV_NegatesFrameRelativeY()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var source = TestHelpers.MakeChain(acls, "Walk", 1);
+        source.Frames[0].RelativeX = 20;
+        source.Frames[0].RelativeY = 7;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+
+        Assert.Equal(20, copy!.Frames[0].RelativeX);  // horizontal offset untouched
+        Assert.Equal(-7, copy.Frames[0].RelativeY);   // vertical flip mirrors sprite offset
+        Assert.Equal(7, source.Frames[0].RelativeY);  // source untouched
+    }
+
+    [Fact]
     public void DuplicateChain_WithFlipH_NegatesFrameRelativeX()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -724,6 +740,32 @@ public class AppCommandsChainTests
         ctx.AppCommands.FlipFrameVertically(frame);
 
         Assert.False(frame.FlipVertical);
+    }
+
+    [Fact]
+    public void FlipFrameVertically_MirrorsAttachedShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.FlipFrameVertically(frame);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(12, rect.X);    // horizontal offset untouched
+        Assert.Equal(-5, rect.Y);    // vertical flip negates Y
+    }
+
+    [Fact]
+    public void FlipFrameVertically_NegatesFrameRelativeY()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+
+        ctx.AppCommands.FlipFrameVertically(frame);
+
+        Assert.Equal(20, frame.RelativeX);   // horizontal offset untouched
+        Assert.Equal(-7, frame.RelativeY);   // sprite offset mirrors about the origin
     }
 
     [Fact]
