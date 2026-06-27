@@ -405,6 +405,42 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_WithFlipH_MirrorsShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var source = TestHelpers.MakeChain(acls, "Attack", 1);
+        source.Frames[0].ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
+        source.Frames[0].ShapesSave!.Shapes.Add(new CircleSave { Name = "Hurt", X = -6, Y = 3 });
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+
+        var rect = copy!.Frames[0].ShapesSave!.AARectSaves.First();
+        Assert.Equal(-10, rect.X);   // horizontal flip negates X
+        Assert.Equal(4, rect.Y);     // vertical offset untouched
+        var circle = copy.Frames[0].ShapesSave!.CircleSaves.First();
+        Assert.Equal(6, circle.X);
+        Assert.Equal(3, circle.Y);
+        // Source must be untouched — duplicate copies, never mutates.
+        Assert.Equal(10, source.Frames[0].ShapesSave!.AARectSaves.First().X);
+    }
+
+    [Fact]
+    public void DuplicateChain_WithFlipV_MirrorsShapeYOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var source = TestHelpers.MakeChain(acls, "Attack", 1);
+        source.Frames[0].ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox", X = 10, Y = 4 });
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipV: true);
+
+        var rect = copy!.Frames[0].ShapesSave!.AARectSaves.First();
+        Assert.Equal(10, rect.X);    // horizontal offset untouched
+        Assert.Equal(-4, rect.Y);    // vertical flip negates Y
+    }
+
+    [Fact]
     public void DuplicateChain_CopiedChainNameIsUnique()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -562,6 +598,35 @@ public class AppCommandsChainTests
         ctx.AppCommands.FlipFrameHorizontally(frame);
 
         Assert.False(frame.FlipHorizontal);
+    }
+
+    [Fact]
+    public void FlipFrameHorizontally_MirrorsAttachedShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(-12, rect.X);   // horizontal flip negates X
+        Assert.Equal(5, rect.Y);     // vertical offset untouched
+    }
+
+    [Fact]
+    public void FlipFrameHorizontally_TwiceRestoresShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(12, rect.X);    // flip is its own inverse — exact restore
+        Assert.Equal(5, rect.Y);
     }
 
     [Fact]

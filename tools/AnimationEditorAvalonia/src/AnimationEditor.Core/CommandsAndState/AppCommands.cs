@@ -692,7 +692,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     foreach (var shape in frame.ShapesSave.Shapes)
                         if (CloneShape(shape) is { } shapeCopy)
+                        {
+                            // Mirror the copy's offsets so collision tracks the flipped sprite.
+                            ShapeFlip.Mirror(shapeCopy, flipH, flipV);
                             fCopy.ShapesSave!.Shapes.Add(shapeCopy);
+                        }
                 }
                 copy.Frames.Add(fCopy);
             }
