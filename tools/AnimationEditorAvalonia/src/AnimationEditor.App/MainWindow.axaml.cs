@@ -3550,7 +3550,26 @@ public partial class MainWindow : Window
         ?? _selectedState.SelectedFrame
         ?? (object?)_selectedState.SelectedChain;
 
-    private async Task HandleCopyAsync()
+    // Copy/Paste are invoked fire-and-forget (_ = HandleCopyAsync()), so an exception
+    // inside them would otherwise vanish as an unobserved task exception — which is how
+    // a clipboard-serialization failure silently produced "nothing happened". Route both
+    // through this guard so any failure surfaces as a visible error instead.
+    internal async Task RunGuardedAsync(Func<Task> action, string actionName)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ {actionName} failed: {ex.Message}", isError: true);
+        }
+    }
+
+    private Task HandleCopyAsync()  => RunGuardedAsync(HandleCopyCoreAsync,  "Copy");
+    private Task HandlePasteAsync() => RunGuardedAsync(HandlePasteCoreAsync, "Paste");
+
+    private async Task HandleCopyCoreAsync()
     {
         if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -3569,7 +3588,7 @@ public partial class MainWindow : Window
             await clipboard.SetTextAsync(xml);
     }
 
-    private async Task HandlePasteAsync()
+    private async Task HandlePasteCoreAsync()
     {
         if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
