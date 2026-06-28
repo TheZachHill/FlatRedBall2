@@ -1,5 +1,7 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Paths;
+using FlatRedBall2.Animation.Content;
+using System;
 
 namespace AnimationEditor.Core.Models
 {
@@ -32,6 +34,24 @@ namespace AnimationEditor.Core.Models
         /// edit history persists across tab switches.
         /// </summary>
         public UndoSnapshot? UndoSnapshot { get; set; }
+
+        /// <summary>
+        /// In-memory editor model for this tab. Populated when the tab is deactivated and
+        /// reused on re-activation when the on-disk file has not changed.
+        /// </summary>
+        public AnimationChainListSave? CachedEditorModel { get; set; }
+
+        /// <summary>
+        /// <see cref="IProjectManager.OnDiskCoordinateType"/> captured with
+        /// <see cref="CachedEditorModel"/>.
+        /// </summary>
+        public TextureCoordinateType CachedOnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
+
+        /// <summary>
+        /// UTC last-write time of <see cref="Path"/> when <see cref="CachedEditorModel"/> was
+        /// captured. Used to detect external edits while the tab was in the background.
+        /// </summary>
+        public DateTime? CachedDiskWriteTimeUtc { get; set; }
 
         /// <summary>
         /// The tab label. Returns <see cref="_displayNameOverride"/> when set;

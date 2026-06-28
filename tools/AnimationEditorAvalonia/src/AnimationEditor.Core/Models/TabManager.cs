@@ -202,7 +202,13 @@ namespace AnimationEditor.Core.Models
             var tab = FindTab(oldPath);
             if (tab == null) return;
             int idx = _tabs.IndexOf(tab);
-            var replacement = new TabEntry(newPath);
+            var replacement = new TabEntry(newPath)
+            {
+                CachedEditorModel = tab.CachedEditorModel,
+                CachedOnDiskCoordinateType = tab.CachedOnDiskCoordinateType,
+                CachedDiskWriteTimeUtc = tab.CachedDiskWriteTimeUtc,
+                UndoSnapshot = tab.UndoSnapshot,
+            };
             _tabs[idx] = replacement;
             if (ActiveTab == tab)
                 ActiveTab = replacement;

@@ -35,17 +35,25 @@ namespace AnimationEditor.Core
         /// </summary>
         public TextureCoordinateType OnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
-        public void LoadAnimationChain(FilePath fileName)
+        public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null)
         {
             if (!fileName.Exists())
                 throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
 
-            var rawContent = File.ReadAllText(fileName.FullPath);
-            if (IO.AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
-                throw new System.IO.InvalidDataException(
-                    $"{IO.AchxConflictMarkerDetector.ConflictMarkerMessage} ({fileName.FullPath})");
+            AnimationChainListSave acls;
+            if (preParsed != null)
+            {
+                acls = preParsed;
+            }
+            else
+            {
+                var rawContent = File.ReadAllText(fileName.FullPath);
+                if (IO.AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
+                    throw new System.IO.InvalidDataException(
+                        $"{IO.AchxConflictMarkerDetector.ConflictMarkerMessage} ({fileName.FullPath})");
 
-            var acls = AnimationChainListSave.FromFile(fileName.FullPath);
+                acls = AnimationChainListSave.FromFile(fileName.FullPath);
+            }
 
             AddShapeCollectionsToFrames(acls);
 

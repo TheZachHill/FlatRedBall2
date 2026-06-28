@@ -69,7 +69,7 @@ public class AppCommandsSaveFailTests
         public string? FileName { get; set; }
         public TextureCoordinateType OnDiskCoordinateType { get; set; }
 
-        public void LoadAnimationChain(FilePath fileName) { }
+        public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null) { }
 
         public void SaveAnimationChainList(string targetPath)
             => throw new InvalidOperationException("Simulated save failure");
