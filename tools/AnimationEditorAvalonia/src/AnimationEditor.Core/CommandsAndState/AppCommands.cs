@@ -121,6 +121,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public event Action<string>? SaveAsCompleted;
 
+        /// <inheritdoc cref="IAppCommands.PixiJsExportCompleted"/>
+        public event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
@@ -273,6 +276,26 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.DeleteRecoveryFile();
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
+        }
+
+        /// <summary>
+        /// Show a file picker and export the current animation chain list as a PixiJS spritesheet
+        /// JSON (<c>SpriteSheetJson</c>). Does nothing if there is no project or the user cancels.
+        /// Fires <see cref="PixiJsExportCompleted"/> with the path and any non-fatal warnings
+        /// (dropped per-frame duration, multiple source textures) on success.
+        /// </summary>
+        public async Task ExportToPixiJsAsync()
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null) return;
+
+            var path = await FileDialogService.PickSaveFileAsync(
+                "Export to PixiJS", "json", "PixiJS Spritesheet (*.json)");
+            if (string.IsNullOrEmpty(path)) return;
+
+            var result = Export.PixiJsSpriteSheetExporter.Export(acls, _pm.GetTextureSizeInPixels);
+            System.IO.File.WriteAllText(path, result.Json);
+            PixiJsExportCompleted?.Invoke(path, result.Warnings);
         }
 
         public void DeleteAnimationChains(List<AnimationChainSave> animationChains)
