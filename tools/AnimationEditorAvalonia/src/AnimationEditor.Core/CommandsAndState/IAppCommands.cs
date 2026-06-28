@@ -1,5 +1,6 @@
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
@@ -77,6 +78,31 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Task OpenAchxWorkflowAsync(string path);
         void LoadAnimationChain(string fileName);
+
+        /// <summary>
+        /// Stores the current project model on <paramref name="tab"/> for later tab switches.
+        /// </summary>
+        void CaptureTabEditorState(TabEntry tab);
+
+        /// <summary>
+        /// Swaps the editor to <paramref name="tab"/>'s cached in-memory model when the cache
+        /// is fresh. Does not clear or restore undo — the app layer handles that.
+        /// </summary>
+        /// <returns><c>true</c> when the cache was applied; <c>false</c> when a disk load is needed.</returns>
+        bool TryActivateTabFromCache(TabEntry tab);
+
+        /// <summary>
+        /// Activates <paramref name="tab"/>'s content from cache when possible; otherwise runs
+        /// <see cref="OpenAchxWorkflowAsync"/>. Does not restore undo.
+        /// </summary>
+        Task ActivateTabContentAsync(TabEntry tab);
+
+        /// <summary>
+        /// Raised after the in-memory project model is loaded or saved from disk so the app
+        /// layer can refresh per-tab caches. The argument is the affected <c>.achx</c> path,
+        /// or <c>null</c> for untitled projects.
+        /// </summary>
+        event Action<string?>? EditorProjectModelChanged;
 
         void RefreshTreeNode(AnimationChainSave animationChain);
         void RefreshTreeNode(AnimationFrameSave animationFrame);

@@ -16,7 +16,7 @@ namespace AnimationEditor.Core.Tests;
 internal sealed class TestServices
 {
     public AnimationChainListSave Acls { get; }
-    public ProjectManager ProjectManager { get; }
+    public IProjectManager ProjectManager { get; }
     public ApplicationEvents ApplicationEvents { get; }
     public SelectedState SelectedState { get; }
     public AppState AppState { get; }
@@ -25,9 +25,11 @@ internal sealed class TestServices
     public UndoManager UndoManager { get; }
     public AppCommands AppCommands { get; }
 
-    public TestServices()
+    public TestServices() : this(new ProjectManager()) { }
+
+    public TestServices(IProjectManager projectManager)
     {
-        ProjectManager    = new ProjectManager();
+        ProjectManager    = projectManager;
         ApplicationEvents = new ApplicationEvents();
         SelectedState     = new SelectedState(ProjectManager);
         AppState          = new AppState(ApplicationEvents, SelectedState);

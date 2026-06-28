@@ -1,6 +1,7 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
@@ -130,6 +131,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.HotReloadFailed"/>
         public event Action<string, string>? HotReloadFailed;
 
+        /// <inheritdoc cref="IAppCommands.EditorProjectModelChanged"/>
+        public event Action<string?>? EditorProjectModelChanged;
+
         // ── Open workflow ─────────────────────────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.OpenAchxWorkflowAsync"/>
@@ -175,7 +179,7 @@ namespace AnimationEditor.Core.CommandsAndState
             bool failed = false;
             void OnFail(string _, Exception __) => failed = true;
             LoadFailed += OnFail;
-            try { LoadAnimationChain(path); }
+            try { LoadAnimationChainFromParsed(path, preview); }
             finally { LoadFailed -= OnFail; }
 
             if (failed) return;
@@ -202,6 +206,26 @@ namespace AnimationEditor.Core.CommandsAndState
                 return;
             }
 
+            FinishLoadIntoEditor(fileName);
+        }
+
+        private void LoadAnimationChainFromParsed(string fileName, AnimationChainListSave preParsed)
+        {
+            try
+            {
+                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(fileName), preParsed);
+            }
+            catch (Exception ex)
+            {
+                LoadFailed?.Invoke(fileName, ex);
+                return;
+            }
+
+            FinishLoadIntoEditor(fileName);
+        }
+
+        private void FinishLoadIntoEditor(string fileName)
+        {
             _undoManager.Clear();
             _undoManager.MarkSaved();
             _selectedState.Reset();
@@ -217,6 +241,46 @@ namespace AnimationEditor.Core.CommandsAndState
             var achxDir = System.IO.Path.GetDirectoryName(fileName) ?? string.Empty;
             var pngPaths = GetReferencedAbsolutePngPaths(fileName, achxDir);
             HotReloadWatcher.StartWatching(fileName, pngPaths);
+
+            EditorProjectModelChanged?.Invoke(fileName);
+        }
+
+        /// <inheritdoc cref="IAppCommands.CaptureTabEditorState"/>
+        public void CaptureTabEditorState(TabEntry tab) =>
+            TabEditorCache.CaptureFromProject(tab, _pm);
+
+        /// <inheritdoc cref="IAppCommands.TryActivateTabFromCache"/>
+        public bool TryActivateTabFromCache(TabEntry tab)
+        {
+            if (!TabEditorCache.HasFreshCache(tab))
+            {
+                TabEditorCache.Invalidate(tab);
+                return false;
+            }
+
+            TabEditorCache.ApplyToProject(tab, _pm);
+
+            _selectedState.Reset();
+            _selectedState.SelectedChain = tab.CachedEditorModel?.AnimationChains.FirstOrDefault();
+            RebuildTreeViewRequested?.Invoke();
+            _ioManager.LoadAndApplyCompanionFileFor(tab.Path.FullPath);
+            RefreshWireframeRequested?.Invoke();
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+            SyncHotReloadWatcher();
+
+            _events.RaiseCurrentFileChanged(tab.Path.FullPath);
+            _events.RaiseAvailableTexturesChanged();
+            return true;
+        }
+
+        /// <inheritdoc cref="IAppCommands.ActivateTabContentAsync"/>
+        public async Task ActivateTabContentAsync(TabEntry tab)
+        {
+            if (TryActivateTabFromCache(tab))
+                return;
+
+            await OpenAchxWorkflowAsync(tab.Path.FullPath);
+            CaptureTabEditorState(tab);
         }
 
         public void RefreshTreeNode(AnimationChainSave animationChain) =>
@@ -244,6 +308,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     _pm.SaveAnimationChainList(target);
                     _undoManager.MarkSaved();
+                    EditorProjectModelChanged?.Invoke(target);
                 }
                 catch
                 {
@@ -1245,6 +1310,7 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshAnimationFrameDisplayRequested?.Invoke();
 
             _events.RaiseAchxReloadedFromDisk(path);
+            EditorProjectModelChanged?.Invoke(path);
         }
 
         /// <inheritdoc cref="IAppCommands.ReloadPngFromDisk"/>

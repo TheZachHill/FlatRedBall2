@@ -352,10 +352,13 @@ public partial class MainWindow : Window
     {
         if (tab == _tabManager.ActiveTab) return;
 
-        // Save the leaving tab's undo history before the editor reloads a different file.
+        // Save the leaving tab's undo history and in-memory model before the editor switches.
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab != null)
+        {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
+            _appCommands.CaptureTabEditorState(leavingTab);
+        }
 
         SaveCompanionFile();
         _tabManager.Activate(tab.Path);
@@ -363,25 +366,39 @@ public partial class MainWindow : Window
         // the file load when the path is already the active tab.
         if (IsUntitledTab(tab))
         {
-            // Untitled tab — reset to a blank editor; there is no on-disk file to reload.
-            _projectManager.AnimationChainListSave = new AnimationChainListSave();
-            _projectManager.FileName = null;
-            _selectedState.Reset();
-            _undoManager.Clear();
-            if (tab.UndoSnapshot != null)
-                _undoManager.RestoreSnapshot(tab.UndoSnapshot);
-            RefreshTreeView();
-            UpdateTitle();
-            UpdateStatusBar();
+            ActivateUntitledTabContent(tab);
         }
         else
         {
-            await _appCommands.OpenAchxWorkflowAsync(tab.Path.FullPath);
+            await _appCommands.ActivateTabContentAsync(tab);
             // LoadAnimationChain cleared the stack — restore this tab's saved history.
             if (tab.UndoSnapshot != null)
                 _undoManager.RestoreSnapshot(tab.UndoSnapshot);
         }
         RebuildTabStrip();
+    }
+
+    private void ActivateUntitledTabContent(TabEntry tab)
+    {
+        _projectManager.AnimationChainListSave =
+            tab.CachedEditorModel ?? new AnimationChainListSave();
+        _projectManager.FileName = null;
+        _selectedState.Reset();
+        _undoManager.Clear();
+        if (tab.UndoSnapshot != null)
+            _undoManager.RestoreSnapshot(tab.UndoSnapshot);
+        RefreshTreeView();
+        UpdateTitle();
+        UpdateStatusBar();
+    }
+
+    private void SyncTabCacheFromEditor(string? path)
+    {
+        TabEntry? tab = path != null
+            ? _tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(path))
+            : _tabManager.ActiveTab;
+        if (tab != null)
+            _appCommands.CaptureTabEditorState(tab);
     }
 
     /// <summary>
@@ -400,25 +417,10 @@ public partial class MainWindow : Window
             // Use OpenAchxWorkflowAsync directly — bypasses EnsureCurrentEditorContentHasTab
             // so the just-closed file is not accidentally re-registered as a background tab.
             if (!IsUntitledTab(next))
-                _ = _appCommands.OpenAchxWorkflowAsync(next.Path.FullPath)
-                    .ContinueWith(_ => Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        if (next.UndoSnapshot != null)
-                            _undoManager.RestoreSnapshot(next.UndoSnapshot);
-                        RebuildTabStrip();
-                    }));
+                _ = ActivateTabAfterCloseAsync(next);
             else
             {
-                // Switching to an Untitled tab — reset to a blank editor.
-                _projectManager.AnimationChainListSave = new AnimationChainListSave();
-                _projectManager.FileName = null;
-                _selectedState.Reset();
-                _undoManager.Clear();
-                if (next.UndoSnapshot != null)
-                    _undoManager.RestoreSnapshot(next.UndoSnapshot);
-                RefreshTreeView();
-                UpdateTitle();
-                UpdateStatusBar();
+                ActivateUntitledTabContent(next);
                 RebuildTabStrip();
             }
         }
@@ -433,6 +435,14 @@ public partial class MainWindow : Window
             UpdateTitle();
             UpdateStatusBar();
         }
+    }
+
+    private async Task ActivateTabAfterCloseAsync(TabEntry tab)
+    {
+        await _appCommands.ActivateTabContentAsync(tab);
+        if (tab.UndoSnapshot != null)
+            _undoManager.RestoreSnapshot(tab.UndoSnapshot);
+        RebuildTabStrip();
     }
 
     private void SaveTabsToSettings()
@@ -538,6 +548,9 @@ public partial class MainWindow : Window
         _appCommands.HotReloadFailed += (path, reason) =>
             Dispatcher.UIThread.InvokeAsync(() =>
                 ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
+
+        _appCommands.EditorProjectModelChanged += path =>
+            Dispatcher.UIThread.InvokeAsync(() => SyncTabCacheFromEditor(path));
 
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
@@ -3082,10 +3095,13 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(fileName)) return;
 
-        // Save the leaving tab's undo history before a different file takes over the editor.
+        // Save the leaving tab's undo history and in-memory model before a different file takes over.
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab != null)
+        {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
+            _appCommands.CaptureTabEditorState(leavingTab);
+        }
 
         // If there is already a file open that hasn't been registered as a tab yet,
         // add it as a background tab so it appears as the first tab when the second
@@ -3106,7 +3122,7 @@ public partial class MainWindow : Window
                 StringComparison.OrdinalIgnoreCase);
             if (!alreadyShown && !string.IsNullOrEmpty(fileName))
             {
-                await _appCommands.OpenAchxWorkflowAsync(fileName);
+                await _appCommands.ActivateTabContentAsync(arrivedTab!);
                 if (arrivedTab?.UndoSnapshot != null)
                     _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
             }
