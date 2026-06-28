@@ -217,6 +217,28 @@ public partial class MainWindow : Window
             row.Children.Add(closeBtn);
             tabBorder.Child = row;
 
+            // Attach a single managed ContextMenu (right-click → Detach / Close).  Letting Avalonia
+            // own the menu via the ContextMenu property — rather than constructing and Open()-ing a
+            // fresh ContextMenu on every right-click PointerPressed — is what prevents the menus from
+            // stacking and failing to dismiss (issue #472): Avalonia reuses this one instance and
+            // light-dismisses it on the next click.
+            tabBorder.ContextMenu = new ContextMenu
+            {
+                Items =
+                {
+                    new MenuItem
+                    {
+                        Header = "Detach to New Window",
+                        Command = new RelayCommand(() => DetachTab(captured)),
+                    },
+                    new MenuItem
+                    {
+                        Header = "Close Tab",
+                        Command = new RelayCommand(() => CloseTab(captured)),
+                    },
+                },
+            };
+
             // Pointer handling: immediate pointer-capture on press (so PointerMoved fires even
             // when the cursor moves over other tabs).  Activation is deferred to PointerReleased
             // so that RebuildTabStrip is never called while a drag is in-flight.
@@ -224,29 +246,6 @@ public partial class MainWindow : Window
             tabBorder.PointerPressed += (_, args) =>
             {
                 var pt = args.GetCurrentPoint(tabBorder);
-                if (pt.Properties.IsRightButtonPressed)
-                {
-                    var menu = new ContextMenu
-                    {
-                        Items =
-                        {
-                            new MenuItem
-                            {
-                                Header = "Detach to New Window",
-                                Command = new RelayCommand(() => DetachTab(captured)),
-                            },
-                            new MenuItem
-                            {
-                                Header = "Close Tab",
-                                Command = new RelayCommand(() => CloseTab(captured)),
-                            },
-                        },
-                    };
-                    menu.Open(tabBorder);
-                    args.Handled = true;
-                    return;
-                }
-
                 if (pt.Properties.IsLeftButtonPressed)
                 {
                     // Skip close-button presses so Button.Click still fires normally.
