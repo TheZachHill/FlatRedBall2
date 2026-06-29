@@ -41,7 +41,16 @@ public class TreeNodeVm : INotifyPropertyChanged
     public bool IsEditing
     {
         get => _isEditing;
-        set { if (_isEditing != value) { _isEditing = value; Notify(); } }
+        set
+        {
+            if (_isEditing != value)
+            {
+                _isEditing = value;
+                Notify();
+                Notify(nameof(ShowDefaultHeader));
+                Notify(nameof(ShowCutHeader));
+            }
+        }
     }
 
     private string _editingText = string.Empty;
@@ -88,6 +97,29 @@ public class TreeNodeVm : INotifyPropertyChanged
     public bool IsRectNode   { get; set; }
     /// <summary>True when this node represents a CircleSave shape. Set once at construction time.</summary>
     public bool IsCircleNode { get; set; }
+
+    private bool _isPendingCut;
+    /// <summary>True while this item is part of a pending cut (Ctrl+X, not yet pasted).</summary>
+    public bool IsPendingCut
+    {
+        get => _isPendingCut;
+        set
+        {
+            if (_isPendingCut != value)
+            {
+                _isPendingCut = value;
+                Notify();
+                Notify(nameof(ShowDefaultHeader));
+                Notify(nameof(ShowCutHeader));
+            }
+        }
+    }
+
+    /// <summary>Default header label when not pending cut and not inline-editing.</summary>
+    public bool ShowDefaultHeader => !_isPendingCut && !_isEditing;
+
+    /// <summary>Cut-pending header label (orange accent).</summary>
+    public bool ShowCutHeader => _isPendingCut && !_isEditing;
 
     /// <summary>
     /// True when this is a frame node that currently has no shape children.

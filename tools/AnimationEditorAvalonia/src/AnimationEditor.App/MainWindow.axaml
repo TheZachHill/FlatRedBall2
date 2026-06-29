@@ -96,6 +96,7 @@
                         <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
                         <Separator />
                         <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
+                        <MenuItem Header="Cu_t"             x:Name="MenuCut"           InputGesture="Ctrl+X" />
                         <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
                         <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate"     InputGesture="Ctrl+D" />
                         <Separator />
@@ -434,8 +435,20 @@
                                                    Foreground="{DynamicResource Ink}"
                                                    Padding="2,1"
                                                    VerticalAlignment="Center"
-                                                   IsVisible="{Binding !IsEditing}"
+                                                   IsVisible="{Binding ShowDefaultHeader}"
                                                    DoubleTapped="OnHeaderTextDoubleTapped" />
+                                        <!-- Pending-cut indicator: orange left bar (distinct from selection) -->
+                                        <Border IsVisible="{Binding ShowCutHeader}"
+                                                BorderBrush="#E07030"
+                                                BorderThickness="2,0,0,0"
+                                                Padding="4,0,0,0"
+                                                VerticalAlignment="Stretch"
+                                                IsHitTestVisible="False">
+                                            <TextBlock Text="{Binding Header}"
+                                                       Foreground="#E07030"
+                                                       Padding="2,1"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
                                         <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
                                         <TextBox Text="{Binding EditingText, Mode=TwoWay}"
                                                  IsVisible="{Binding IsEditing}"
