@@ -9,7 +9,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>MyGame</RootNamespace>
     <MonoGamePlatform>DesktopGL</MonoGamePlatform>
-  </PropertyGroup> Its version flows transitively from
+  </PropertyGroup>
+
+  <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
        FlatRedBall2.MonoGame (see $(AposShapesVersion) in the engine's AposShapes.props).
        Precompiled apos-shapes.xnb is wired by templates/build/AposShapesPrecompiled.props. -->
   <ItemGroup>
