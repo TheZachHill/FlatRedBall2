@@ -1145,8 +1145,8 @@ public class WireframeControl : Control
     {
         var snap = new RenderSnapshot
         {
-            // Snapshot so LoadTexture can dispose _image without racing the render thread.
-            Image        = _image?.Snapshot(),
+            // Per-draw-op clone so LoadTexture can dispose _image without racing the render thread.
+            Image        = CloneBitmapAsImage(_bitmap),
             ImageWidth   = _bitmap?.Width ?? 0,
             ImageHeight  = _bitmap?.Height ?? 0,
             PanX         = _panX,
@@ -1183,6 +1183,18 @@ public class WireframeControl : Control
         // Move-drag still works via HitTestHandle, which uses _frameRects directly.
 
         return snap;
+    }
+
+    /// <summary>
+    /// Builds an <see cref="SKImage"/> owned by a single <see cref="DrawOp"/> so the UI thread
+    /// can replace <see cref="_image"/> in <see cref="LoadTexture"/> without use-after-dispose on
+    /// the render thread.
+    /// </summary>
+    private static SKImage? CloneBitmapAsImage(SKBitmap? bitmap)
+    {
+        if (bitmap is null) return null;
+        var copy = bitmap.Copy();
+        return SKImage.FromBitmap(copy);
     }
 
     // ── Mouse input ───────────────────────────────────────────────────────────
