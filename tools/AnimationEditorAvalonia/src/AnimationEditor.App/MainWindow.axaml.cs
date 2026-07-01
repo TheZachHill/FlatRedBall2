@@ -1853,6 +1853,9 @@ public partial class MainWindow : Window
         ExpandAllBtn.Click  += (_, _) => SetAllExpanded(true);
         CollapseAllBtn.Click += (_, _) => SetAllExpanded(false);
 
+        // Search box: icon toggles the inline box; typing filters the tree by chain name.
+        WireTreeSearch();
+
         // Blank-space double-tap: expand / collapse the node
         AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
 
@@ -1878,6 +1881,99 @@ public partial class MainWindow : Window
     {
         foreach (var node in _treeRoots)
             TreeNodeVm.SetExpandedRecursive(node, expanded);
+    }
+
+    // Current ANIMATIONS tree filter text. Empty/whitespace = no filter (full tree).
+    // The filter is *sticky*: it survives selection and model edits. Two triggers apply
+    // it differently — ApplyQueryFilter (typing) may hide rows; the model-change paths
+    // (RefreshTreeView/RefreshChainNode) are grow-only and never hide a visible row.
+    private string _treeFilterQuery = string.Empty;
+
+    private void WireTreeSearch()
+    {
+        SearchToggleBtn.Click += (_, _) => ToggleSearchBox();
+
+        // Typing recomputes visibility from scratch — this is the only path allowed to hide.
+        SearchBox.TextChanged += (_, _) =>
+        {
+            _treeFilterQuery = SearchBox.Text ?? string.Empty;
+            ApplyQueryFilter();
+        };
+
+        // Two-stage ✕: with text, clear it (box stays open); when already empty, collapse.
+        SearchClearBtn.Click += (_, _) =>
+        {
+            if (TreeSearchBoxLogic.ClearShouldCollapse(SearchBox.Text))
+                CollapseSearchBox();
+            else
+            {
+                SearchBox.Text = string.Empty; // fires TextChanged → ApplyQueryFilter restores all
+                SearchBox.Focus();
+            }
+        };
+
+        // Escape collapses the box (and clears the filter); handled tunnel-phase so it
+        // doesn't reach the TreeView (which would otherwise steal the key).
+        SearchBox.AddHandler(
+            InputElement.KeyDownEvent,
+            (object? _, KeyEventArgs e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    CollapseSearchBox();
+                    e.Handled = true;
+                }
+            },
+            RoutingStrategies.Tunnel);
+
+        // Click-away collapses the box — EXCEPT when focus moves into the tree, so the
+        // sticky-filter workflow (filter, click a result, edit, click another) keeps the
+        // box and filter alive. Deferred to Background so the new focus target has settled.
+        SearchBox.LostFocus += (_, _) =>
+            Dispatcher.UIThread.Post(CollapseSearchBoxOnClickAway, DispatcherPriority.Background);
+    }
+
+    // Query-change path: the only place allowed to HIDE a chain (typing/refining shrinks
+    // the set); an empty query shows all. The selected row stays visible via its IsVisible
+    // binding. Logic lives in the pure, unit-tested TreeBuilder.ApplyQueryFilter.
+    private void ApplyQueryFilter() =>
+        TreeBuilder.ApplyQueryFilter(_treeRoots, _treeFilterQuery);
+
+    private void ToggleSearchBox()
+    {
+        if (SearchBox.IsVisible) CollapseSearchBox();
+        else ExpandSearchBox();
+    }
+
+    // Pattern B: the box replaces the 🔍 icon (they are never both visible) and takes focus.
+    private void ExpandSearchBox()
+    {
+        SearchToggleBtn.IsVisible = false;
+        SearchBox.IsVisible = true;
+        Dispatcher.UIThread.Post(() => SearchBox.Focus(), DispatcherPriority.Background);
+    }
+
+    // Hides the box, restores the 🔍 icon, and clears the query (restoring the full tree).
+    // Clearing the text fires TextChanged, which re-applies the empty filter.
+    private void CollapseSearchBox()
+    {
+        SearchBox.IsVisible = false;
+        SearchToggleBtn.IsVisible = true;
+        SearchBox.Text = string.Empty;
+    }
+
+    // Collapses the box when focus has left both the box and the tree. Keeping the box open
+    // while focus is in the tree is what preserves the sticky click-a-result workflow.
+    private void CollapseSearchBoxOnClickAway()
+    {
+        if (!SearchBox.IsVisible) return;
+        var focused = FocusManager?.GetFocusedElement() as Avalonia.Visual;
+        bool focusInBox  = focused is not null &&
+            (ReferenceEquals(focused, SearchBox) || focused.GetVisualAncestors().Contains(SearchBox));
+        bool focusInTree = focused is not null &&
+            (ReferenceEquals(focused, AnimTree) || focused.GetVisualAncestors().Contains(AnimTree));
+        if (!focusInBox && !focusInTree)
+            CollapseSearchBox();
     }
 
     private void AddAnimationChainAndBeginInlineRename()
@@ -2434,10 +2530,35 @@ public partial class MainWindow : Window
             var acls = _projectManager.AnimationChainListSave;
             if (acls is null) { _treeRoots.Clear(); RefreshFilesPanel(); return; }
 
+            // Capture filter state BEFORE the diff mutates the tree: which chains are
+            // currently visible, and which existing chains have nodes. Used for the
+            // grow-only visibility recompute below.
+            // NOTE: this reads PinnedVisible only — a chain visible *solely* via the
+            // IsSelected half of the row's `PinnedVisible || IsSelected` binding is not
+            // captured here. That's benign: SyncTreeSelection re-applies the selection
+            // after the diff, so the selected row is re-shown regardless of PinnedVisible.
+            var chains = acls.AnimationChains;
+            var previouslyVisible = _treeRoots
+                .Where(n => n.Data is AnimationChainSave && n.PinnedVisible)
+                .Select(n => (AnimationChainSave)n.Data!)
+                .ToList();
+            var existingChains = new HashSet<AnimationChainSave>(
+                _treeRoots.Where(n => n.Data is AnimationChainSave).Select(n => (AnimationChainSave)n.Data!),
+                ReferenceEqualityComparer.Instance);
+            var brandNew = chains.Where(c => !existingChains.Contains(c)).ToList();
+
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
-            TreeBuilder.SyncChainsInto(_treeRoots, acls.AnimationChains);
+            TreeBuilder.SyncChainsInto(_treeRoots, chains);
             ApplyPendingPastedChainExpand();
+
+            // Grow-only: never hide a chain that was visible; add newly-relevant ones.
+            var visible = TreeBuilder.ComputeVisibleAfterModelChange(
+                previouslyVisible, chains, _treeFilterQuery, brandNew);
+            foreach (var node in _treeRoots)
+                if (node.Data is AnimationChainSave c)
+                    node.PinnedVisible = visible.Contains(c);
+
             RefreshTreeThumbnails();
 
             // Re-select to keep visual state
@@ -2471,9 +2592,14 @@ public partial class MainWindow : Window
             }
 
             // Empty expandedChainNames (not null) collapses every chain; null would
-            // default them all to expanded.
+            // default them all to expanded. All nodes are added (membership always
+            // mirrors the model); an active filter is applied as per-node visibility so
+            // it persists across a full rebuild without dropping nodes from the tree.
             foreach (var node in TreeBuilder.BuildTree(acls, System.Array.Empty<string>()))
+            {
+                node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
                 _treeRoots.Add(node);
+            }
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
@@ -2493,6 +2619,7 @@ public partial class MainWindow : Window
             var node = FindChainNode(chain);
             if (node is null)
             {
+                // Brand-new node defaults to visible (never hide something just created).
                 _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
             }
             else
@@ -2500,6 +2627,9 @@ public partial class MainWindow : Window
                 node.Header = chain.Name;
                 node.Meta   = $"{chain.Frames.Count} fr";
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
+                // Grow-only: keep it visible if it already was, or if it now matches.
+                node.PinnedVisible = node.PinnedVisible
+                    || TreeBuilder.MatchesFilter(chain.Name, _treeFilterQuery);
             }
             RefreshTreeThumbnails();
             SyncTreeSelection();
