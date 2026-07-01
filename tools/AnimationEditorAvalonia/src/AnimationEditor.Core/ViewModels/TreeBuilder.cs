@@ -382,6 +382,70 @@ public static class TreeBuilder
         return null;
     }
 
+    // ── Search / filter ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Case-insensitive substring match of a single chain name against a search
+    /// <paramref name="query"/>. A <c>null</c>, empty, or whitespace-only query
+    /// matches every name (no filter active). Leading/trailing whitespace in the
+    /// query is ignored.
+    /// </summary>
+    public static bool MatchesFilter(string chainName, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return true;
+        return chainName.Contains(query.Trim(), System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Query-change path: sets each chain (root) node's
+    /// <see cref="TreeNodeVm.PinnedVisible"/> to whether its header matches
+    /// <paramref name="query"/> under <see cref="MatchesFilter"/>. This is the <b>only</b>
+    /// filter path allowed to hide a row — typing/refining the query shrinks the visible
+    /// set; an empty/whitespace query shows every chain. Non-chain nodes (frames, shapes)
+    /// are left untouched: they are hidden only when their parent chain is.
+    /// <para>
+    /// Contrast with <see cref="ComputeVisibleAfterModelChange"/>, the grow-only path used
+    /// when the model mutates but the query is unchanged.
+    /// </para>
+    /// </summary>
+    public static void ApplyQueryFilter(IEnumerable<TreeNodeVm> roots, string? query)
+    {
+        foreach (var node in roots)
+            if (node.Data is AnimationChainSave)
+                node.PinnedVisible = MatchesFilter(node.Header, query);
+    }
+
+    /// <summary>
+    /// Computes which chains should be visible after a <b>model mutation</b> while the
+    /// search <paramref name="query"/> is unchanged (rename, add, delete, undo/redo,
+    /// hot-reload). This is <b>grow-only</b>: it never hides a chain that was already
+    /// visible, so the chain the user is editing can't vanish out from under them.
+    /// A chain is visible when it was <paramref name="previouslyVisible"/>, is
+    /// <paramref name="brandNew"/> to the tree (just created or undo-restored), or its
+    /// current name matches <paramref name="query"/> (newly relevant, or no filter).
+    /// <para>
+    /// Identity is by reference — a renamed chain keeps the same object, so it stays
+    /// visible via <paramref name="previouslyVisible"/> even though its name changed.
+    /// The <b>selected</b> chain is intentionally not handled here (folding it in would
+    /// permanently pin every chain the user ever clicked); selection is kept visible
+    /// reactively at the view layer via a <c>PinnedVisible || IsSelected</c> binding.
+    /// </para>
+    /// </summary>
+    public static HashSet<AnimationChainSave> ComputeVisibleAfterModelChange(
+        IEnumerable<AnimationChainSave> previouslyVisible,
+        IReadOnlyList<AnimationChainSave> currentChains,
+        string? query,
+        IEnumerable<AnimationChainSave> brandNew)
+    {
+        var prev = new HashSet<AnimationChainSave>(previouslyVisible, ReferenceEqualityComparer.Instance);
+        var brand = new HashSet<AnimationChainSave>(brandNew, ReferenceEqualityComparer.Instance);
+        var result = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
+        foreach (var chain in currentChains)
+            if (prev.Contains(chain) || brand.Contains(chain) || MatchesFilter(chain.Name, query))
+                result.Add(chain);
+        return result;
+    }
+
     // ── Node search ───────────────────────────────────────────────────────────
 
     /// <summary>
