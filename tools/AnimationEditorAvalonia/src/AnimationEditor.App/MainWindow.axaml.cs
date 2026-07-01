@@ -1350,6 +1350,15 @@ public partial class MainWindow : Window
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
+        // ToggleType="CheckBox" flips IsChecked before Click fires, so read it and mirror onto both
+        // canvas panels. The InputGesture="F3" registers the accelerator (same mechanism as the
+        // Ctrl+N etc. menu items), so F3 routes here too — no separate KeyDown branch needed.
+        MenuShowDiagnostics.Click += (_, _) =>
+        {
+            bool on = MenuShowDiagnostics.IsChecked == true;
+            WireframeCtrl.DiagnosticsEnabled = on;
+            PreviewCtrl.DiagnosticsEnabled   = on;
+        };
         MenuSettings.Click += OnSettingsClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuCut.Click           += (_, _) => _ = HandleCutAsync();
@@ -4091,8 +4100,8 @@ public partial class MainWindow : Window
                     else if (vm.Data is CircleSave circle)
                         BeginInlineRename(vm, circle.Name);
                 }
-                else
-                    WireframeCtrl.ToggleDebugMode();
+                // F2 is rename-only. Render diagnostics moved to F3 / Help ▸ Show Render Diagnostics
+                // (the old F2 fallback was unreachable — a tree node is essentially always selected).
             }
             else if (e.Key == Key.Z && HasCommandModifier(e.KeyModifiers) &&
                      !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -4122,8 +4131,8 @@ public partial class MainWindow : Window
                 _altMenuActivationSuppressor.ArmFromAltArrowReorder();
                 int delta = e.Key == Key.Up ? -1 : +1;
                 _appCommands.HandleReorder(delta);
-                // Restore focus to the tree — reorder can cause Avalonia to shift focus
-                // away, which would make F2 fall through to WireframeCtrl.ToggleDebugMode.
+                // Restore focus to the tree — reorder can cause Avalonia to shift focus away, which
+                // would let F2 hit the wrong target for a subsequent rename.
                 Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
                 if (_selectedState.SelectedFrame is not null)
                     ShowStatusMessage("Frame labels updated to reflect new positions");

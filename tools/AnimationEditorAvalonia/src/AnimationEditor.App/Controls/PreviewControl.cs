@@ -50,15 +50,23 @@ public class PreviewControl : Control
     private float _zoomPivotVpY;
     private const float ZoomAnimIntervalSeconds = 1f / 60f;
 
-    // -- Draw-time diagnostics (#514) ------------------------------------------
-    // Flip to true to overlay the rolling-average Skia render time (ms/frame + fps) on the
-    // preview, top-left. Measures the compositor-thread render — where the cost actually lands
-    // (the UI-thread Render() only builds the snapshot).
-    // static readonly, NOT const: a const false lets the compiler prove the timing branch
-    // unreachable and trip CS0162 (an error in this project). static readonly is folded at
-    // runtime, so flipping this one line still toggles the overlay.
-    private static readonly bool ShowDrawDiagnostics = false;
+    // -- Render diagnostics (#514) ---------------------------------------------
+    // When enabled, overlays the rolling-average Skia render time (ms/frame + fps) top-left.
+    // Measures the compositor-thread render — where the cost actually lands (the UI-thread
+    // Render() only builds the snapshot). Toggled at runtime via DiagnosticsEnabled; MainWindow
+    // wires F3 and the Help menu item to flip this in lock-step with the wireframe panel.
+    private bool _showDiagnostics;
     private readonly RollingAverage _drawTimes = new(10);
+
+    /// <summary>
+    /// Shows/hides the draw-time diagnostics overlay. Toggled at runtime from MainWindow
+    /// (F3 and the Help ▸ Show Render Diagnostics menu item).
+    /// </summary>
+    public bool DiagnosticsEnabled
+    {
+        get => _showDiagnostics;
+        set { _showDiagnostics = value; InvalidateVisual(); }
+    }
 
     // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
@@ -876,7 +884,7 @@ public class PreviewControl : Control
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
                 BuildShapeInfos(), frameOffX, frameOffY),
-            _thumbnailService.ImageCache, _palette, _drawTimes));
+            _thumbnailService.ImageCache, _palette, _showDiagnostics ? _drawTimes : null));
     }
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
@@ -2047,10 +2055,10 @@ public class PreviewControl : Control
         private readonly RenderSnapshot              _snap;
         private readonly Dictionary<string, SKImage?> _cache;
         private readonly CanvasPalette                _palette;
-        private readonly RollingAverage              _drawTimes;
+        private readonly RollingAverage?             _drawTimes;   // non-null only when diagnostics are on
 
         public DrawOp(RenderSnapshot snap, Dictionary<string, SKImage?> cache, CanvasPalette palette,
-            RollingAverage drawTimes)
+            RollingAverage? drawTimes)
         {
             _snap      = snap;
             _cache     = cache;
@@ -2069,9 +2077,7 @@ public class PreviewControl : Control
             if (feature is null) return;
             using var lease = feature.Lease();
 
-            // The `if (const false)` body is exempt from the unreachable-code warning, so this
-            // whole diagnostics path compiles out cleanly in Release without a pragma.
-            if (ShowDrawDiagnostics)
+            if (_drawTimes is not null)
             {
                 // Time only the Skia render — it runs on the compositor/render thread, where the
                 // frame cost actually lands (the UI-thread Render() just builds the snapshot).

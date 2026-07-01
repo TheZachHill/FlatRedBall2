@@ -308,18 +308,13 @@ public class WireframeControl : Control
     // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
     private bool _needsInitialCenter;
 
-    // ── Draw-time diagnostics (#514) ──────────────────────────────────────────
-    // Flip ShowDrawDiagnostics to overlay the rolling-average Skia render time (ms/frame + fps),
-    // top-left. This is the panel to watch for the #514 slowdown — panning/zooming a large sheet
-    // redraws it (60fps during smooth-zoom). static readonly, NOT const: a const false would let
-    // the compiler prove the timing branch unreachable and trip CS0162 (an error here).
-    private static readonly bool ShowDrawDiagnostics = false;
+    // ── Render diagnostics (#514): one overlay, toggled at runtime by F3 / Help menu ──
+    // When enabled the panel shows the rolling-average Skia render time (ms/frame + fps, drawn
+    // top-left inside the custom draw op) AND a camera-stats panel stacked below it. This is THE
+    // panel to watch for the #514 slowdown — panning/zooming a large sheet redraws it (60fps during
+    // smooth-zoom). Toggle via DiagnosticsEnabled; MainWindow wires F3 and the Help menu item.
+    private bool _showDiagnostics;
     private readonly RollingAverage _drawTimes = new(10);
-
-    // ── Debug tooling (toggle with F2 in the live app) ────────────────────────
-    private bool _debugMode;
-    private static readonly string _debugLogPath =
-        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wireframe_debug.log");
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
     // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
     private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
@@ -330,64 +325,43 @@ public class WireframeControl : Control
     private CanvasPalette _palette = CanvasPalette.Dark;
 
     /// <summary>
-    /// Toggle the real-time debug overlay + event log.  Bind to F2 in MainWindow.
-    /// Log is written to <see cref="DebugLogPath"/>.
+    /// Shows/hides the render-diagnostics overlay (draw-time readout + camera stats). Toggled at
+    /// runtime from MainWindow (F3 and the Help ▸ Show Render Diagnostics menu item).
     /// </summary>
-    public void ToggleDebugMode()
+    public bool DiagnosticsEnabled
     {
-        _debugMode = !_debugMode;
-        if (_debugMode)
-        {
-            File.WriteAllText(_debugLogPath,
-                $"=== WireframeControl debug log {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n" +
-                $"Repro: add anim → add frame → load sprite → grid on → zoom 100% → " +
-                $"1 wheel notch → pan right\n\n");
-            DebugLog("DEBUG_ON", $"log={_debugLogPath}");
-        }
-        else
-        {
-            DebugLog("DEBUG_OFF", "overlay hidden");
-        }
-        InvalidateVisual();
+        get => _showDiagnostics;
+        set { _showDiagnostics = value; InvalidateVisual(); }
     }
 
-    /// <summary>Path to the active debug event log file.</summary>
-    public static string DebugLogPath => _debugLogPath;
-
-    private void DebugLog(string category, string msg)
-    {
-        if (!_debugMode) return;
-        var line = $"{DateTime.Now:HH:mm:ss.fff} [{category,-14}] {msg}";
-        File.AppendAllText(_debugLogPath, line + "\n");
-    }
-
+    // Camera-stats panel. Sits below the ms/frame box (drawn by the custom op via DrawTimeOverlay),
+    // so it starts at TopOffset to avoid overlapping it — both are left-aligned under one toggle.
     private void DrawDebugOverlay(DrawingContext ctx)
     {
-        if (!_debugMode) return;
+        if (!_showDiagnostics) return;
         int bmpW = _bitmap?.Width  ?? 0;
         int bmpH = _bitmap?.Height ?? 0;
 
         var lines = new[]
         {
-            "── WIREFRAME DEBUG (F2 to hide) ──",
+            "── WIREFRAME (F3 to hide) ──",
             $"zoom          {_zoom * 100f,7:F1}%",
             $"panXY         X={_panX,7:F1}  Y={_panY:F1}",
             $"viewport      {Bounds.Width:F0} × {Bounds.Height:F0}",
             $"content       {bmpW * _zoom:F0} × {bmpH * _zoom:F0}",
             $"isPanning     {_isPanning}",
-            "──────────────────────────────────",
-            $"log: {System.IO.Path.GetFileName(_debugLogPath)}",
         };
 
         const double fsz  = 12;
         const double lineH = 15;
         const double padX  = 6;
         const double padY  = 4;
+        const double topOffset = 28;   // clears the ms/frame box the draw op renders at the top
         double panelW = 310;
         double panelH = lines.Length * lineH + padY * 2;
 
-        ctx.FillRectangle(_dbgBg, new Rect(0, 0, panelW, panelH));
-        double y = padY;
+        ctx.FillRectangle(_dbgBg, new Rect(0, topOffset, panelW, panelH));
+        double y = topOffset + padY;
         foreach (var line in lines)
         {
             ctx.DrawText(new FormattedText(
@@ -1080,7 +1054,7 @@ public class WireframeControl : Control
     {
         UpdatePalette();
         var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette, ShowDrawDiagnostics ? _drawTimes : null));
+        ctx.Custom(new DrawOp(snap, _palette, _showDiagnostics ? _drawTimes : null));
         DrawDebugOverlay(ctx);
     }
 
