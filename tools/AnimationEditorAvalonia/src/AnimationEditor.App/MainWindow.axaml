@@ -487,11 +487,13 @@
                                            TextAlignment="Right"
                                            VerticalAlignment="Center"
                                            IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                <!-- Inline "Add Frame" button — only visible on chain nodes; shown on hover -->
+                                <!-- Inline "Add Frame" button — only visible on chain nodes; shown on hover.
+                                     22px pointer target (Fitts's Law); zero vertical margin keeps it under the
+                                     32px Fluent row height (TreeViewItemMinHeight) so the row never grows. -->
                                 <Button Grid.Column="2"
                                         Classes="add-frame-btn plus"
                                         IsVisible="{Binding IsChainNode}"
-                                        Width="18" Height="18"
+                                        Width="22" Height="22"
                                         Padding="0"
                                         Margin="4,0,4,0"
                                         HorizontalContentAlignment="Center"
