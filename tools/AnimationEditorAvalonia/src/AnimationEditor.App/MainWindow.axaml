@@ -437,6 +437,16 @@
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="10" />
                         </Style>
+                        <!-- Zebra bands must read as one continuous block per animation group. Each row's
+                             band is the background of its own PART_LayoutRoot; at fractional display scales
+                             (125%/150%) layout rounding snaps each row to whole device pixels independently,
+                             which can leave a 1px transparent seam between adjacent rows. A 1px downward
+                             bleed makes consecutive bands overlap by a pixel, closing that seam. Rows within
+                             a group share a color so the overlap is invisible; at a group boundary it is a
+                             single near-imperceptible pixel of the lower-contrast band. -->
+                        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+                            <Setter Property="Margin" Value="0,0,0,-1" />
+                        </Style>
                         <!-- The Fluent theme's :empty style overrides the panel width to 12px for
                              leaf items, causing their content to start ~20px left of non-leaf items.
                              Override it here with the same width so leaf and non-leaf items
