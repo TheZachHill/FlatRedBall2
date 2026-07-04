@@ -850,4 +850,54 @@ public class GridRenderTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Dragging the right handle left past an off-grid left edge with grid on must
+    /// not invert the frame (Right &lt; Left, handles rendering on the inside). The
+    /// right edge stays clamped to the left edge; the frame never flips.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateHandleDrag_ResizeRightEdgePastOffGridLeftWithGridOn_DoesNotInvert()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
+
+        var chain = new AnimationChainSave { Name = "C" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            // Off-grid X and width: left=21, right=45 (width 24).
+            LeftCoordinate   = 21f / 100f,
+            TopCoordinate    = 21f / 100f,
+            RightCoordinate  = 45f / 100f,
+            BottomCoordinate = 45f / 100f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);
+
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            // Grab the right edge at x=45 and drag far left to x=5 (past left=21).
+            ctrl.SimulateHandleDrag(HandleKind.MidRight, 45f, 33f, 5f, 33f);
+
+            // Frame must stay non-inverted; left edge stays put at 21.
+            Assert.True(frame.RightCoordinate > frame.LeftCoordinate,
+                $"Frame inverted: Left={frame.LeftCoordinate}, Right={frame.RightCoordinate}");
+            Assert.Equal(21f / 100f, frame.LeftCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }
