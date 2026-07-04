@@ -396,6 +396,13 @@
                                  rows hug their content (icon/text) instead of floating in centered air. -->
                             <Setter Property="MinHeight" Value="0" />
                             <Setter Property="Padding" Value="0" />
+                            <!-- Flatten Fluent's rounded row corners (ControlCornerRadius). PART_LayoutRoot
+                                 carries both the zebra band and the selection highlight via
+                                 CornerRadius="{TemplateBinding CornerRadius}"; with the default radius the
+                                 stacked per-row bands leave rounded-corner notches between them, so a
+                                 group's band reads as broken. Square corners let consecutive rows' bands
+                                 tile flush into one continuous block. -->
+                            <Setter Property="CornerRadius" Value="0" />
                             <!-- Zebra band per animation group: the container Background is the row's
                                  lowest layer (Fluent paints :selected / :pointerover on top of it), and
                                  it spans the full row width including the indent column — so the band

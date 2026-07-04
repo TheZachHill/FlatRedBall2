@@ -855,6 +855,31 @@ public class HeadlessTreeViewTests
     }
 
     [AvaloniaFact]
+    public void TreeViewItem_CornerRadius_IsZero_SoZebraBandsTileFlush()
+    {
+        // Issue #551: the zebra band lives on the TreeViewItem's PART_LayoutRoot, which also
+        // carries CornerRadius via TemplateBinding. Fluent's default rounded corners would leave
+        // notch-shaped gaps between a group's stacked row bands. CornerRadius must resolve to 0
+        // so consecutive rows tile flush into one continuous band.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var items = tree.GetVisualDescendants().OfType<TreeViewItem>().ToList();
+            Assert.NotEmpty(items);
+            Assert.All(items, tvi => Assert.Equal(new Avalonia.CornerRadius(0), tvi.CornerRadius));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void MoveChain_PreservesChainCollapseState()
     {
         // Regression (#237): reordering chains rebuilt the whole tree and re-expanded
