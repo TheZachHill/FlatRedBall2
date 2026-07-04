@@ -126,9 +126,13 @@ public class TimelinePlaybackControlsTests
             preview.ScrubToFrame(1, 0.5);         // paused, mid frame 1
             Dispatcher.UIThread.RunJobs();
 
-            preview.TogglePlayPause();            // resume
-            Dispatcher.UIThread.RunJobs();
-
+            preview.TogglePlayPause();            // resume — sets state synchronously
+            // Assert the resume state immediately. Do NOT pump the dispatcher here:
+            // ResumePlayback restarts the real 60 fps timer, and a pumped tick would
+            // credit up to MaxTickSeconds (0.25s) of elapsed time — far more than the
+            // 0.05s left in frame 1 — advancing the playhead to frame 2 and making the
+            // CurrentFrameIndex assertion flaky. IsPlaying, the un-pin, and the frame
+            // index are all set synchronously by ResumePlayback.
             Assert.True(preview.IsPlaying);
             Assert.Null(ctx.SelectedState.SelectedFrame);          // un-pinned
             Assert.Equal(1, preview.Playback.CurrentFrameIndex);   // resumed from playhead, not reset to 0
