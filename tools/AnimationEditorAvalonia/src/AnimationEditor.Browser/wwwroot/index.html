@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>AnimationEditor.Browser (#535 spike)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Avalonia's .avalonia-native-host div (hosts native text-input elements) sits on top of
+           the canvas in DOM/paint order. Without an explicit transparent background it inherits an
+           opaque dark fill (observed rgb(20,21,21), likely browser auto-dark-theme on unstyled
+           elements) that fully hides whatever the canvas drew underneath. */
+        .avalonia-native-host { background: transparent !important; }
+    </style>
+</head>
+
+<body style="margin: 0; overflow: hidden">
+<div id="out"></div>
+<script type='module' src="./main.js"></script>
+</body>
+
+</html>
