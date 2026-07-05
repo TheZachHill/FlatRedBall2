@@ -248,9 +248,46 @@ pieces, but a real end-to-end human/OS-driven test (actually dragging a file,
 actually clicking through a native folder picker) is the one remaining gap —
 same category as M1's real-browser rendering check earlier in this doc.
 
-**Explicitly out of scope:** the PNG folder-scan panel (`PngFolderScanner`/
-`PngFolderWatcher`) is pure `Directory.EnumerateFiles` + `FileSystemWatcher` —
-no browser equivalent exists for the live-watch behavior (File System Access
-API folder access is a one-time grant with no persistent watch primitive).
-Per the issue's own framing, this stays desktop-only rather than attempting a
-redesign as part of M3.
+**Update: live-watch landed after all, via polling.** The PNG folder-scan
+panel's desktop implementation (`PngFolderScanner`/`PngFolderWatcher`) is pure
+`Directory.EnumerateFiles` + `FileSystemWatcher`, neither of which exist in
+the browser — but before writing that off, two real alternatives were
+researched:
+
+1. **`FileSystemObserver`** — a real, *stable* browser API (shipped Chrome
+   133, Jan 29 2025, enabled by default; Chromium-only, no Firefox/Safari) that
+   does exactly what `FileSystemWatcher` does. Investigated by pulling
+   Avalonia's actual `BrowserStorageProvider.cs`/`JSStorageItem` source from
+   GitHub: every `IStorageFile`/`IStorageFolder` Avalonia hands out wraps the
+   real JS handle in `internal JSObject FileHandle` — not reachable from
+   outside the `Avalonia.Browser` assembly, and confirmed via an Avalonia
+   GitHub discussion ([#11001](https://github.com/AvaloniaUI/Avalonia/discussions/11001))
+   that this isn't on their roadmap. Using `FileSystemObserver` for real would
+   mean bypassing `IStorageProvider` entirely — our own `showDirectoryPicker()`
+   JS interop, our own folder enumeration, our own file reading — duplicating
+   a slice of `Avalonia.Browser`'s internals, permanently browser-only, with
+   **two incompatible folder grants** (Avalonia's picker for loading, a
+   separate custom one for watching) since a handle from one can't be reused
+   as the other.
+2. **Poll `Size`/`DateModified` and diff** — the option actually implemented.
+   `IStorageItem.GetBasicPropertiesAsync()` is fully public, already-integrated
+   Avalonia API, and reusing the *same* `IStorageFolder` handle Open Folder
+   already granted needs no second permission prompt.
+
+**Landed:** `FolderSnapshotDiff.FindChanged` (`AnimationEditor.Core/IO/`) is
+the pure comparison at the heart of the poll — given two named snapshots of
+`(Size, DateModified)`, returns which names changed; a new/deleted file is not
+reported (TDD'd, `FolderSnapshotDiffTests.cs`, 6 tests). `BrowserFolderWatcher`
+wraps it with a `DispatcherTimer` polling every 2s over the folder Open Folder
+already opened. Detected changes queue up rather than auto-applying — matching
+"see a diff, prompt the user to refresh" rather than silently swapping a
+texture out from under an in-progress edit — surfaced as a "Reload Changed
+Textures (N)" button that decodes the changed PNGs, calls
+`ThumbnailService.InvalidatePath` + `SeedTexture` to replace them, and
+invalidates the preview.
+
+**Verified:** the pure diff logic via unit tests; the app still builds and the
+bundled sample still loads/plays with the new UI in place. **Not verified,
+same reason as Open Folder/Save As above:** actually watching a real folder
+across an external file edit requires driving the native OS folder picker,
+which no tool in this environment can do.

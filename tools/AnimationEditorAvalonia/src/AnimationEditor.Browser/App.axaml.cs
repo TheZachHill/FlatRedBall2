@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using AnimationEditor.App.Controls;
 using AnimationEditor.App.Services;
@@ -73,12 +75,54 @@ public partial class App : Application
 
         var openButton = new Button { Content = "Open Folder…" };
         var saveAsButton = new Button { Content = "Save As…" };
+        var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
         var toolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             Margin = new Thickness(8),
-            Children = { openButton, saveAsButton },
+            Children = { openButton, saveAsButton, reloadButton },
+        };
+
+        // #535 M3 follow-up: no FileSystemWatcher in the browser, so texture edits made outside
+        // the page (e.g. re-saving a PNG in an image editor) are only detected by polling
+        // GetBasicPropertiesAsync (see BrowserFolderWatcher). Detected changes are queued here and
+        // applied only when the user clicks Reload -- matching "see a diff, prompt to refresh"
+        // rather than silently swapping textures out from under the user mid-edit.
+        BrowserFolderWatcher? folderWatcher = null;
+        IStorageFolder? watchedFolder = null;
+        var pendingChangedPngs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void UpdateReloadButton()
+        {
+            reloadButton.IsVisible = pendingChangedPngs.Count > 0;
+            reloadButton.Content = $"Reload Changed Textures ({pendingChangedPngs.Count})";
+        }
+
+        reloadButton.Click += async (_, _) =>
+        {
+            if (watchedFolder is null || pendingChangedPngs.Count == 0) return;
+
+            foreach (var name in pendingChangedPngs)
+            {
+                var file = await watchedFolder.GetFileAsync(name);
+                if (file is null) continue;
+
+                await using var pngStream = await file.OpenReadAsync();
+                using var buffer = new System.IO.MemoryStream();
+                await pngStream.CopyToAsync(buffer);
+
+                var bitmap = SKBitmap.Decode(buffer.ToArray());
+                if (bitmap is null) continue;
+
+                thumbnailService.InvalidatePath(name);
+                thumbnailService.SeedTexture(name, bitmap);
+            }
+
+            status.Text = $"Reloaded {pendingChangedPngs.Count} texture(s).";
+            pendingChangedPngs.Clear();
+            UpdateReloadButton();
+            preview.InvalidateVisual();
         };
 
         var root = new DockPanel();
@@ -128,6 +172,18 @@ public partial class App : Application
             status.Text = loaded
                 ? $"Loaded from folder \"{folder.Name}\"."
                 : $"No .achx found in \"{folder.Name}\".";
+
+            folderWatcher?.Dispose();
+            pendingChangedPngs.Clear();
+            UpdateReloadButton();
+            watchedFolder = folder;
+            folderWatcher = new BrowserFolderWatcher(folder, TimeSpan.FromSeconds(2));
+            folderWatcher.ChangedPngsDetected += names =>
+            {
+                foreach (var name in names) pendingChangedPngs.Add(name);
+                UpdateReloadButton();
+            };
+            await folderWatcher.StartAsync();
         };
 
         saveAsButton.Click += async (_, _) =>
