@@ -1345,6 +1345,32 @@ public class HeadlessTreeViewTests
             finally { window.Close(); }
     }
 
+    [AvaloniaTheory]
+    [InlineData(Key.Return)]
+    [InlineData(Key.Escape)]
+    public void FinishRename_ReturnsFocusToTree_NotToWindowChrome(Key key)
+    {
+            // Regression (#591 follow-up): committing (Enter) or cancelling (Escape) an inline
+            // rename removes the TextBox from the visual tree. If nothing explicitly refocuses
+            // the tree, Avalonia's focus fallback picks an arbitrary next focusable control
+            // (e.g. the window's minimize button), so pressing Down right afterward moves
+            // window-chrome focus instead of navigating to the next tree row.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var (_, chainNode, tb) = BeginRenameOnExpandedChain(window, ctx);
+
+                RaiseKeyDown(tb, key);
+
+                Assert.False(chainNode.IsEditing);
+                var focused = window.FocusManager?.GetFocusedElement();
+                Assert.True(
+                    focused is TreeView or TreeViewItem,
+                    $"After {key} ends the rename, focus should stay on the tree, but was: {focused?.GetType().Name ?? "null"}");
+            }
+            finally { window.Close(); }
+    }
+
     /// <summary>
     /// Sets up an expanded chain node (so it's collapsible) with an active inline rename,
     /// and returns the tree, the chain node, and its active rename TextBox.

@@ -5627,12 +5627,13 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             CommitInlineRename(vm, tb.Text ?? string.Empty);
+            FocusTreeAfterRename(vm);
         }
         else if (e.Key == Key.Escape)
         {
             e.Handled = true;
             vm.CancelEdit();
-            AnimTree.Focus();
+            FocusTreeAfterRename(vm);
         }
         else if (e.Key is Key.Left or Key.Right)
         {
@@ -5659,6 +5660,22 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
     }
+
+    // AnimTree (the TreeView itself) has Focusable=false — only its TreeViewItem containers
+    // are focusable — so AnimTree.Focus() is always a no-op. Committing/cancelling a rename
+    // also flips the TextBox's IsVisible binding off, and Avalonia's own focus-fallback (moving
+    // focus off a now-invisible control) runs on a later dispatcher tick than this handler.
+    // Without an explicit refocus posted after that fallback, keyboard focus ends up on
+    // whatever window chrome is next in tab order (e.g. the minimize button) instead of back
+    // on the row that was being renamed.
+    private void FocusTreeAfterRename(TreeNodeVm vm)
+        => Dispatcher.UIThread.Post(() =>
+        {
+            AnimTree.GetVisualDescendants()
+                .OfType<TreeViewItem>()
+                .FirstOrDefault(t => t.DataContext == vm)
+                ?.Focus();
+        }, DispatcherPriority.Render);
 
     private void OnInlineRenameLostFocus(object? sender, RoutedEventArgs e)
     {
