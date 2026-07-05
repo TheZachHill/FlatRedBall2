@@ -5634,6 +5634,30 @@ public partial class MainWindow : Window
             vm.CancelEdit();
             AnimTree.Focus();
         }
+        else if (e.Key is Key.Left or Key.Right)
+        {
+            // Same Tunnel-interception point as Enter/Escape above (issue #591): this runs
+            // before TreeViewItem.OnKeyDown, which otherwise treats Left/Right as
+            // expand/collapse and steals keyboard focus off the TextBox (ending the rename
+            // via OnInlineRenameLostFocus) instead of just moving the caret. We move the
+            // caret ourselves rather than re-dispatching the key, since re-raising it on the
+            // TextBox would route back through this same Tunnel handler.
+            e.Handled = true;
+            var min = Math.Min(tb.SelectionStart, tb.SelectionEnd);
+            var max = Math.Max(tb.SelectionStart, tb.SelectionEnd);
+            var hasSelection = min != max;
+            var newCaret = e.Key == Key.Left
+                ? (hasSelection ? min : Math.Max(0, tb.CaretIndex - 1))
+                : (hasSelection ? max : Math.Min((tb.Text ?? string.Empty).Length, tb.CaretIndex + 1));
+            tb.SelectionStart = newCaret;
+            tb.SelectionEnd = newCaret;
+        }
+        else if (e.Key is Key.Up or Key.Down)
+        {
+            // Single-line rename box: Up/Down have no caret meaning. Swallow them here so
+            // TreeViewItem doesn't navigate to a sibling row and end the rename via focus loss.
+            e.Handled = true;
+        }
     }
 
     private void OnInlineRenameLostFocus(object? sender, RoutedEventArgs e)
