@@ -32,7 +32,7 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Dark = new(
         Background:      new SKColor(0x0e, 0x0f, 0x12),
         TextureOutline:  new SKColor(255, 255, 255, 160),
-        GridLineMinor:   new SKColor(255, 255, 255, 22),
+        GridLineMinor:   new SKColor(255, 255, 255, 40),
         GridLineMajor:   new SKColor(255, 255, 255, 80),
         RulerBackground: new SKColor(50, 50, 55),
         RulerTick:       new SKColor(160, 160, 165),
@@ -44,7 +44,7 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Light = new(
         Background:      new SKColor(0xe8, 0xea, 0xed),
         TextureOutline:  new SKColor(0, 0, 0, 140),
-        GridLineMinor:   new SKColor(0, 0, 0, 18),
+        GridLineMinor:   new SKColor(0, 0, 0, 34),
         GridLineMajor:   new SKColor(0, 0, 0, 70),
         RulerBackground: new SKColor(225, 227, 231),
         RulerTick:       new SKColor(110, 116, 124),
