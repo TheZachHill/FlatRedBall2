@@ -3057,7 +3057,10 @@ public partial class MainWindow : Window
             // Walk up the visual tree to find the containing TreeViewItem.
             if (e.Source is not Control src) return;
             var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-            if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
+            // Right-clicking a node that's already part of the current multi-selection must
+            // leave the whole selection intact (Explorer-style) so the context menu acts on the
+            // whole group. Only collapse to just this node when it isn't already selected.
+            if (tvi?.DataContext is TreeNodeVm vm && !AnimTree.SelectedItems.Contains(vm))
                 AnimTree.SelectedItem = vm;
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 1)
