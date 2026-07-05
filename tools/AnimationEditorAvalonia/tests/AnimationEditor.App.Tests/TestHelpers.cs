@@ -62,10 +62,10 @@ internal sealed class TestServices
         return ctrl;
     }
 
-    public PreviewControl CreatePreviewControl()
+    public PreviewControl CreatePreviewControl(System.Action<string>? showError = null)
     {
         var ctrl = new PreviewControl();
-        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, ThumbnailService, PendingCutState);
+        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, ThumbnailService, PendingCutState, showError);
         return ctrl;
     }
 }

@@ -377,6 +377,7 @@ public class PreviewControl : Control
     private IUndoManager? _undoManager;
     private ThumbnailService? _thumbnailService;
     private IPendingCutState? _pendingCutState;
+    private Action<string>? _showError;
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
@@ -392,7 +393,8 @@ public class PreviewControl : Control
         IProjectManager projectManager,
         IUndoManager undoManager,
         ThumbnailService thumbnailService,
-        IPendingCutState pendingCutState)
+        IPendingCutState pendingCutState,
+        Action<string>? showError = null)
     {
         _selectedState  = selectedState;
         _appState       = appState;
@@ -402,6 +404,7 @@ public class PreviewControl : Control
         _undoManager    = undoManager;
         _thumbnailService = thumbnailService;
         _pendingCutState  = pendingCutState;
+        _showError        = showError;
 
         _selectedState.SelectionChanged                        += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed                               += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -417,6 +420,12 @@ public class PreviewControl : Control
     {
         ClipToBounds = true;
         Focusable    = true;
+
+        // Right-click (when it doesn't hit a guide — see OnPointerPressed) opens this menu
+        // with a "View <filename> in Explorer" item for the currently previewed texture.
+        var contextMenu = new ContextMenu();
+        contextMenu.Opening += OnContextMenuOpening;
+        ContextMenu = contextMenu;
 
         // Repaint when the app theme variant changes so the canvas/ruler colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
@@ -581,8 +590,10 @@ public class PreviewControl : Control
     /// Test-only: simulates a right-click at the given control-space point,
     /// removing any guide within hit distance. Mirrors <see cref="OnPointerPressed"/> so
     /// headless tests can drive the right-click removal code path without synthesising events.
+    /// Returns <c>true</c> if a guide was removed — <see cref="OnPointerPressed"/> uses this
+    /// to decide whether to suppress the reveal-in-explorer context menu.
     /// </summary>
-    public void SimulateRightClick(float x, float y) => TryRemoveGuideAt(x, y);
+    public bool SimulateRightClick(float x, float y) => TryRemoveGuideAt(x, y);
 
     /// <summary>
     /// Test-only: simulates a left-click on the canvas at (<paramref name="px"/>, <paramref name="py"/>)
@@ -1201,6 +1212,48 @@ public class PreviewControl : Control
         return false;
     }
 
+    // -- Reveal in Explorer -----------------------------------------------------
+
+    /// <summary>
+    /// Resolves the absolute path of the currently previewed frame's texture (via
+    /// <see cref="ISelectedState.SelectedTextureName"/>), relative to the loaded .achx file's
+    /// directory. Returns <c>null</c> when nothing is selected or the frame has no texture set.
+    /// </summary>
+    internal string? ResolveSelectedTexturePath()
+    {
+        var textureName = _selectedState?.SelectedTextureName;
+        if (string.IsNullOrEmpty(textureName)) return null;
+
+        var achxFile = _projectManager?.FileName;
+        if (string.IsNullOrEmpty(achxFile)) return textureName;
+
+        var achxDir = new FilePath(achxFile).GetDirectoryContainingThis();
+        return new FilePath(achxDir.FullPath + textureName).FullPath;
+    }
+
+    /// <summary>
+    /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
+    /// currently previewed texture, or cancels the menu entirely when there's nothing to reveal.
+    /// </summary>
+    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var absPath = ResolveSelectedTexturePath();
+        if (ContextMenu is not { } menu || absPath is null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        menu.Items.Clear();
+        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
+        item.Click += (_, _) =>
+        {
+            var error = ShellExplorer.RevealFile(absPath);
+            if (error is not null) _showError?.Invoke(error);
+        };
+        menu.Items.Add(item);
+    }
+
     /// <summary>
     /// Returns the topmost collision shape under the given screen-space point, or
     /// <c>null</c> if no shape is hit. The currently selected shape has priority over
@@ -1529,7 +1582,10 @@ public class PreviewControl : Control
 
         if (props.IsRightButtonPressed)
         {
-            TryRemoveGuideAt(px, py);
+            // A guide-removing click consumes the right-click; otherwise let it fall through
+            // so Avalonia opens the "View <filename> in Explorer" ContextMenu as normal.
+            if (TryRemoveGuideAt(px, py))
+                e.Handled = true;
             return;
         }
 
