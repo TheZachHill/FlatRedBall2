@@ -115,6 +115,10 @@ public class PreviewControl : Control
     private const float RulerSize = 20f;
     private const float PanPadding = 0f;
 
+    // Set by OnPointerPressed when a right-click removes a guide; consumed by
+    // OnPointerReleased to suppress the reveal-in-explorer ContextMenu for that same click.
+    private bool _suppressContextMenuOnRelease;
+
     // Neutral canvas/ruler colors for the active theme variant. Refreshed from
     // ActualThemeVariant on every render and whenever the variant changes.
     private CanvasPalette _palette = CanvasPalette.Dark;
@@ -1583,9 +1587,11 @@ public class PreviewControl : Control
         if (props.IsRightButtonPressed)
         {
             // A guide-removing click consumes the right-click; otherwise let it fall through
-            // so Avalonia opens the "View <filename> in Explorer" ContextMenu as normal.
-            if (TryRemoveGuideAt(px, py))
-                e.Handled = true;
+            // so Avalonia opens the "View <filename> in Explorer" ContextMenu as normal. Note
+            // that Control's context-menu logic runs in OnPointerReleased against the *released*
+            // event's own Handled flag — marking Handled here on the pressed event has no effect
+            // on it, so the actual suppression happens in OnPointerReleased below.
+            _suppressContextMenuOnRelease = TryRemoveGuideAt(px, py);
             return;
         }
 
@@ -1734,6 +1740,15 @@ public class PreviewControl : Control
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
+        // Must run before base.OnPointerReleased: Control's own override raises
+        // ContextRequested (opening the ContextMenu) based on this event's Handled flag
+        // *during* that base call, so setting Handled afterwards would be too late.
+        if (_suppressContextMenuOnRelease && e.InitialPressMouseButton == MouseButton.Right)
+        {
+            e.Handled = true;
+            _suppressContextMenuOnRelease = false;
+        }
+
         base.OnPointerReleased(e);
 
 

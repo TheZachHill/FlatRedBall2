@@ -1,6 +1,10 @@
 using AnimationEditor.App.Controls;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
 using System.ComponentModel;
 using System.Linq;
@@ -135,5 +139,83 @@ public class PreviewRevealInExplorerTests
         ctrl.AddHGuide(0f); // world Y=0 -> screen Y=42
 
         Assert.False(ctrl.SimulateRightClick(30f, 20f));
+    }
+
+    // ── End-to-end: real right-click through the pointer pipeline ─────────────
+    //
+    // Regression for a real bug found in manual testing: marking the PointerPressedEventArgs
+    // Handled does NOT stop the ContextMenu from opening. Avalonia's Control.OnPointerReleased
+    // raises ContextRequested based on the *PointerReleasedEventArgs*' own Handled flag (checked
+    // before this control's OnPointerReleased override even runs its own logic, since the base
+    // call happens first) — a completely separate event object from the press. These tests drive
+    // real synthetic press+release events through a live window instead of calling the test-only
+    // SimulateRightClick hook, which only mirrors the press half and would not have caught this.
+
+    private static (MainWindow Window, TestServices Ctx) CreateWindowWithTexturedFrame()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "hero.png" };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+        Dispatcher.UIThread.RunJobs();
+
+        return (window, ctx);
+    }
+
+    private static Point PreviewCenterInWindow(MainWindow window, PreviewControl preview)
+    {
+        // Mirrors PreviewControl's own CenterX/CenterY math (RulerSize = 20).
+        float centerX = (float)((preview.Bounds.Width - 20) / 2 + 20);
+        float centerY = (float)((preview.Bounds.Height - 20) / 2 + 20);
+        return preview.TranslatePoint(new Point(centerX, centerY), window)!.Value;
+    }
+
+    [AvaloniaFact]
+    public void RealRightClick_OnGuide_RemovesGuideAndDoesNotOpenContextMenu()
+    {
+        var (window, _) = CreateWindowWithTexturedFrame();
+        try
+        {
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            preview.AddHGuide(0f); // world Y=0 -> screen Y = preview's own centre
+            Dispatcher.UIThread.RunJobs();
+
+            var point = PreviewCenterInWindow(window, preview);
+            window.MouseDown(point, MouseButton.Right);
+            window.MouseUp(point, MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(0, preview.HGuideCount);
+            Assert.Empty(preview.ContextMenu!.Items);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RealRightClick_AwayFromGuide_OpensContextMenuWithRevealItem()
+    {
+        var (window, _) = CreateWindowWithTexturedFrame();
+        try
+        {
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            var point = PreviewCenterInWindow(window, preview);
+            window.MouseDown(point, MouseButton.Right);
+            window.MouseUp(point, MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+
+            var item = preview.ContextMenu!.Items.OfType<MenuItem>().Single();
+            Assert.Equal("View hero.png in Explorer", item.Header);
+        }
+        finally { window.Close(); }
     }
 }
