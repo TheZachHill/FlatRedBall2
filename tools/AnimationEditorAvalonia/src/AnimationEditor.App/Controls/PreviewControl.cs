@@ -2332,11 +2332,7 @@ public class PreviewControl : Control
         if (flip)
         {
             canvas.Save();
-            // General 2x2 affine flip (diagonal transposes axes, H/V mirror) pivoted on (cx, cy):
-            // output = M*(point - pivot) + pivot. Plain Scale can't express the diagonal case
-            // (off-diagonal coefficients), so build the matrix directly instead.
-            var (a, b, c, d) = FlipScaleCalculator.ComputeMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
-            var matrix = new SKMatrix(a, b, cx - a * cx - b * cy, c, d, cy - c * cx - d * cy, 0, 0, 1);
+            var matrix = ComputeFlipMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal, cx, cy);
             canvas.Concat(in matrix);
         }
 
@@ -2356,6 +2352,19 @@ public class PreviewControl : Control
             IsStroke    = true
         };
         canvas.DrawRect(outlineDst, op);
+    }
+
+    /// <summary>
+    /// Builds the pivoted flip transform for <see cref="DrawFrameCore"/>: a general 2x2 affine
+    /// map (diagonal transposes axes, H/V mirror) pivoted on (<paramref name="cx"/>,
+    /// <paramref name="cy"/>) — output = M*(point - pivot) + pivot. Plain <c>canvas.Scale</c>
+    /// can't express the diagonal case (off-diagonal coefficients), so the matrix is built
+    /// directly. Exposed (internal) for unit testing via <c>SKMatrix.MapPoint</c>.
+    /// </summary>
+    internal static SKMatrix ComputeFlipMatrix(bool flipHorizontal, bool flipVertical, bool flipDiagonal, float cx, float cy)
+    {
+        var (a, b, c, d) = FlipScaleCalculator.ComputeMatrix(flipHorizontal, flipVertical, flipDiagonal);
+        return new SKMatrix(a, b, cx - a * cx - b * cy, c, d, cy - c * cx - d * cy, 0, 0, 1);
     }
 
     /// <summary>

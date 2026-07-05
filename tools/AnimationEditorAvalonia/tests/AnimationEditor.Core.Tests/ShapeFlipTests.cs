@@ -61,40 +61,40 @@ public class ShapeFlipTests
     }
 
     [Fact]
-    public void Transpose_Circle_SwapsAndNegatesOffset()
+    public void Transpose_Circle_SwapsOffset()
     {
         var c = new CircleSave { X = -6, Y = 3, Radius = 7 };
 
         ShapeFlip.Transpose(c);
 
-        Assert.Equal(-3, c.X);
-        Assert.Equal(6, c.Y);
+        Assert.Equal(3, c.X);
+        Assert.Equal(-6, c.Y);
         Assert.Equal(7, c.Radius); // radius is orientation-independent
     }
 
     [Fact]
-    public void Transpose_PolygonOriginAndPoints_SwapsAndNegatesEach()
+    public void Transpose_PolygonOriginAndPoints_SwapsEach()
     {
         var p = new PolygonSave { X = 4, Y = 2 };
         p.Points.Add(new Vector2Save { X = 1, Y = 5 });
 
         ShapeFlip.Transpose(p);
 
-        Assert.Equal(-2, p.X);
-        Assert.Equal(-4, p.Y);
-        Assert.Equal(-5, p.Points[0].X);
-        Assert.Equal(-1, p.Points[0].Y);
+        Assert.Equal(2, p.X);
+        Assert.Equal(4, p.Y);
+        Assert.Equal(5, p.Points[0].X);
+        Assert.Equal(1, p.Points[0].Y);
     }
 
     [Fact]
-    public void Transpose_RectOffsetAndScale_SwapsAndNegatesOffsetSwapsScale()
+    public void Transpose_RectOffsetAndScale_SwapsOffsetAndScale()
     {
         var r = new AARectSave { X = 10, Y = 4, ScaleX = 3, ScaleY = 5 };
 
         ShapeFlip.Transpose(r);
 
-        Assert.Equal(-4, r.X);
-        Assert.Equal(-10, r.Y);
+        Assert.Equal(4, r.X);
+        Assert.Equal(10, r.Y);
         Assert.Equal(5, r.ScaleX);
         Assert.Equal(3, r.ScaleY);
     }

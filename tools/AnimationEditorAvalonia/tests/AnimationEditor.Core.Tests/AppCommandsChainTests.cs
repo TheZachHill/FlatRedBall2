@@ -650,8 +650,8 @@ public class AppCommandsChainTests
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
 
         var rect = frame.ShapesSave.AARectSaves.First();
-        Assert.Equal(-5, rect.X);    // (x,y) -> (-y,-x)
-        Assert.Equal(-12, rect.Y);
+        Assert.Equal(5, rect.X);    // (x,y) -> (y,x)
+        Assert.Equal(12, rect.Y);
     }
 
     [Fact]
@@ -662,8 +662,8 @@ public class AppCommandsChainTests
 
         ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
 
-        Assert.Equal(-7, frame.RelativeX);    // (x,y) -> (-y,-x)
-        Assert.Equal(-20, frame.RelativeY);
+        Assert.Equal(7, frame.RelativeX);    // (x,y) -> (y,x)
+        Assert.Equal(20, frame.RelativeY);
     }
 
     [Fact]

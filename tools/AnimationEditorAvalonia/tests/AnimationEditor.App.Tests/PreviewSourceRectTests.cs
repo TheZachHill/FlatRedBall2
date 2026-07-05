@@ -127,4 +127,34 @@ public class PreviewSourceRectTests
         Assert.Equal(30, outline.MidX);
         Assert.Equal(50, outline.MidY);
     }
+
+    // ── ComputeFlipMatrix — diagonal-only must reflect about the "up and to the right"
+    // (bottom-left/top-right) diagonal: top-left content swaps with bottom-right content,
+    // and top-right/bottom-left corners (on the axis) stay in place. ──────────────────────
+
+    [Fact]
+    public void ComputeFlipMatrix_DiagonalOnly_SwapsTopLeftAndBottomRight()
+    {
+        var matrix = PreviewControl.ComputeFlipMatrix(
+            flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
+
+        var topLeft = matrix.MapPoint(new SKPoint(5, 5));       // offset (-5,-5) from pivot
+        var bottomRight = matrix.MapPoint(new SKPoint(15, 15)); // offset (+5,+5) from pivot
+
+        Assert.Equal(new SKPoint(15, 15), topLeft);      // top-left corner moves to bottom-right
+        Assert.Equal(new SKPoint(5, 5), bottomRight);    // bottom-right corner moves to top-left
+    }
+
+    [Fact]
+    public void ComputeFlipMatrix_DiagonalOnly_LeavesTopRightAndBottomLeftInPlace()
+    {
+        var matrix = PreviewControl.ComputeFlipMatrix(
+            flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
+
+        var topRight = matrix.MapPoint(new SKPoint(15, 5));  // offset (+5,-5) from pivot
+        var bottomLeft = matrix.MapPoint(new SKPoint(5, 15)); // offset (-5,+5) from pivot
+
+        Assert.Equal(new SKPoint(15, 5), topRight);   // on the up-right axis — unchanged
+        Assert.Equal(new SKPoint(5, 15), bottomLeft);  // on the up-right axis — unchanged
+    }
 }

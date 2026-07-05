@@ -47,10 +47,14 @@ public static class ShapeFlip
 
     /// <summary>
     /// Transposes the offsets of <paramref name="shape"/> in place to match a frame's diagonal
-    /// flip: (x, y) becomes (-y, -x), the same transpose <c>TileMapCollisions.ApplyFlips</c> uses
-    /// for Tiled's diagonal tile-flip flag. A rectangle's <c>ScaleX</c>/<c>ScaleY</c> (half-width/
-    /// half-height) swap too, since the transposed region's bounding box swaps width and height.
-    /// A circle's radius is orientation-independent and untouched. Self-inverse, like
+    /// flip: (x, y) becomes (y, x). Shape offsets live in the same Y-up entity space as
+    /// <c>AnimationFrameSave.RelativeX</c>/<c>RelativeY</c> (the renderer negates Y when converting
+    /// to screen space), so a plain swap here reflects the shape about the same "up-and-right"
+    /// diagonal the sprite's pixel content is transposed about on screen — see
+    /// <c>FlipScaleCalculator.ComputeMatrix</c>, which operates in screen space and needs the
+    /// negated (-y, -x) form for the same visual result. A rectangle's <c>ScaleX</c>/<c>ScaleY</c>
+    /// (half-width/half-height) swap too, since the transposed region's bounding box swaps width
+    /// and height. A circle's radius is orientation-independent and untouched. Self-inverse, like
     /// <see cref="Mirror"/> — applying it twice restores the original values exactly.
     /// </summary>
     public static void Transpose(object shape)
@@ -58,16 +62,16 @@ public static class ShapeFlip
         switch (shape)
         {
             case AARectSave r:
-                (r.X, r.Y) = (-r.Y, -r.X);
+                (r.X, r.Y) = (r.Y, r.X);
                 (r.ScaleX, r.ScaleY) = (r.ScaleY, r.ScaleX);
                 break;
             case CircleSave c:
-                (c.X, c.Y) = (-c.Y, -c.X);
+                (c.X, c.Y) = (c.Y, c.X);
                 break;
             case PolygonSave p:
-                (p.X, p.Y) = (-p.Y, -p.X);
+                (p.X, p.Y) = (p.Y, p.X);
                 foreach (var pt in p.Points)
-                    (pt.X, pt.Y) = (-pt.Y, -pt.X);
+                    (pt.X, pt.Y) = (pt.Y, pt.X);
                 break;
         }
     }

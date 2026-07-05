@@ -57,8 +57,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                         break;
                     case FlipAxis.Diagonal:
                         frame.FlipDiagonal = !frame.FlipDiagonal;
-                        // Same transpose as ShapeFlip.Transpose / TileMapCollisions.ApplyFlips: (x,y) -> (-y,-x).
-                        (frame.RelativeX, frame.RelativeY) = (-frame.RelativeY, -frame.RelativeX);
+                        // RelativeX/RelativeY live in Y-up entity space (PreviewControl negates Y when
+                        // converting to screen space), so a plain (x,y) -> (y,x) swap here is what
+                        // reflects the offset about the same "up-and-right" diagonal the sprite's
+                        // pixel content is transposed about (that transform runs in Y-down screen
+                        // space, where the equivalent reflection needs the negated (-y,-x) form —
+                        // see FlipScaleCalculator.ComputeMatrix). Same swap as ShapeFlip.Transpose.
+                        (frame.RelativeX, frame.RelativeY) = (frame.RelativeY, frame.RelativeX);
                         break;
                 }
 
