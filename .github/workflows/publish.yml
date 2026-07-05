@@ -41,8 +41,37 @@ jobs:
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
           echo "Auto-incremented to: $NEXT"
 
-  publish:
+  publish-animation-content:
     needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Animation.Content/FlatRedBall2.Animation.Content.csproj
+
+      - name: Build and Pack (FlatRedBall2.Animation.Content)
+        run: >
+          dotnet pack src/Animation.Content/FlatRedBall2.Animation.Content.csproj
+          -c Release
+          -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
+          -o out
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # Depends on publish-animation-content so FlatRedBall2.Animation.Content is already on nuget.org
+  # (matching this same resolved version) before FlatRedBall2.MonoGame/Kni's auto-generated
+  # dependency on it needs to resolve. See src/Animation.Content/FlatRedBall2.Animation.Content.csproj
+  # for why this dependency exists at all.
+  publish:
+    needs: [resolve-version, publish-animation-content]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
