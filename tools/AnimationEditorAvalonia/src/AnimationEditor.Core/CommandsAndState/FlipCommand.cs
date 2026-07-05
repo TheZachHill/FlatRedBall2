@@ -57,13 +57,17 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                         break;
                     case FlipAxis.Diagonal:
                         frame.FlipDiagonal = !frame.FlipDiagonal;
-                        // RelativeX/RelativeY live in Y-up entity space (PreviewControl negates Y when
-                        // converting to screen space), so a plain (x,y) -> (y,x) swap here is what
-                        // reflects the offset about the same "up-and-right" diagonal the sprite's
-                        // pixel content is transposed about (that transform runs in Y-down screen
-                        // space, where the equivalent reflection needs the negated (-y,-x) form —
-                        // see FlipScaleCalculator.ComputeMatrix). Same swap as ShapeFlip.Transpose.
-                        (frame.RelativeX, frame.RelativeY) = (frame.RelativeY, frame.RelativeX);
+                        // RelativeX/RelativeY are already baked for the frame's current H/V state, so
+                        // toggling diagonal must apply the delta between the old and new baked state,
+                        // not a fixed transpose: a plain (x,y) -> (y,x) swap when H and V currently
+                        // agree, a negated (x,y) -> (-y,-x) swap when exactly one is set. See
+                        // ShapeFlip.Transpose's remarks for the derivation — using a fixed swap
+                        // regardless of H/V put the offset in the wrong spot whenever diagonal was
+                        // toggled after horizontal or vertical (issue #592 follow-up).
+                        bool negateRelative = frame.FlipHorizontal ^ frame.FlipVertical;
+                        (frame.RelativeX, frame.RelativeY) = negateRelative
+                            ? (-frame.RelativeY, -frame.RelativeX)
+                            : (frame.RelativeY, frame.RelativeX);
                         break;
                 }
 
@@ -74,7 +78,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                     foreach (var shape in frame.ShapesSave.Shapes)
                     {
                         if (_axis == FlipAxis.Diagonal)
-                            ShapeFlip.Transpose(shape);
+                            ShapeFlip.Transpose(shape, frame.FlipHorizontal, frame.FlipVertical);
                         else
                             ShapeFlip.Mirror(shape, _axis == FlipAxis.Horizontal, _axis == FlipAxis.Vertical);
                     }

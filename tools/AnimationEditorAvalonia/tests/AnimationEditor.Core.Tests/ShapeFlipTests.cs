@@ -61,11 +61,11 @@ public class ShapeFlipTests
     }
 
     [Fact]
-    public void Transpose_Circle_SwapsOffset()
+    public void Transpose_CircleHVAgree_SwapsOffsetPlain()
     {
         var c = new CircleSave { X = -6, Y = 3, Radius = 7 };
 
-        ShapeFlip.Transpose(c);
+        ShapeFlip.Transpose(c, flipHorizontal: false, flipVertical: false);
 
         Assert.Equal(3, c.X);
         Assert.Equal(-6, c.Y);
@@ -73,12 +73,23 @@ public class ShapeFlipTests
     }
 
     [Fact]
-    public void Transpose_PolygonOriginAndPoints_SwapsEach()
+    public void Transpose_CircleHVDisagree_SwapsOffsetNegated()
+    {
+        var c = new CircleSave { X = -6, Y = 3, Radius = 7 };
+
+        ShapeFlip.Transpose(c, flipHorizontal: true, flipVertical: false);
+
+        Assert.Equal(-3, c.X);
+        Assert.Equal(6, c.Y);
+    }
+
+    [Fact]
+    public void Transpose_PolygonOriginAndPointsHVAgree_SwapsEachPlain()
     {
         var p = new PolygonSave { X = 4, Y = 2 };
         p.Points.Add(new Vector2Save { X = 1, Y = 5 });
 
-        ShapeFlip.Transpose(p);
+        ShapeFlip.Transpose(p, flipHorizontal: true, flipVertical: true);
 
         Assert.Equal(2, p.X);
         Assert.Equal(4, p.Y);
@@ -87,11 +98,11 @@ public class ShapeFlipTests
     }
 
     [Fact]
-    public void Transpose_RectOffsetAndScale_SwapsOffsetAndScale()
+    public void Transpose_RectOffsetAndScaleHVAgree_SwapsOffsetAndScalePlain()
     {
         var r = new AARectSave { X = 10, Y = 4, ScaleX = 3, ScaleY = 5 };
 
-        ShapeFlip.Transpose(r);
+        ShapeFlip.Transpose(r, flipHorizontal: false, flipVertical: false);
 
         Assert.Equal(4, r.X);
         Assert.Equal(10, r.Y);
@@ -100,14 +111,27 @@ public class ShapeFlipTests
     }
 
     [Fact]
-    public void Transpose_RectTwice_RestoresExactly()
+    public void Transpose_RectOffsetHVDisagree_SwapsOffsetNegated()
     {
         var r = new AARectSave { X = 10, Y = 4, ScaleX = 3, ScaleY = 5 };
 
-        ShapeFlip.Transpose(r);
-        ShapeFlip.Transpose(r);
+        ShapeFlip.Transpose(r, flipHorizontal: false, flipVertical: true);
 
-        Assert.Equal(10, r.X); // transpose is its own inverse — no drift
+        Assert.Equal(-4, r.X);
+        Assert.Equal(-10, r.Y);
+        Assert.Equal(5, r.ScaleX);   // scale swap has no sign ambiguity
+        Assert.Equal(3, r.ScaleY);
+    }
+
+    [Fact]
+    public void Transpose_RectTwiceSameHV_RestoresExactly()
+    {
+        var r = new AARectSave { X = 10, Y = 4, ScaleX = 3, ScaleY = 5 };
+
+        ShapeFlip.Transpose(r, flipHorizontal: true, flipVertical: false);
+        ShapeFlip.Transpose(r, flipHorizontal: true, flipVertical: false);
+
+        Assert.Equal(10, r.X); // same delta applied twice is its own inverse — no drift
         Assert.Equal(4, r.Y);
         Assert.Equal(3, r.ScaleX);
         Assert.Equal(5, r.ScaleY);
