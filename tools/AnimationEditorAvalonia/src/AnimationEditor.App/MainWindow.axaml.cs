@@ -3789,6 +3789,24 @@ public partial class MainWindow : Window
         return await tcs.Task;
     }
 
+    /// <summary>
+    /// Shows <paramref name="values"/>'s shared value in <paramref name="control"/>, or blanks it
+    /// with a "(mixed)" placeholder when the selected frames disagree on that property.
+    /// </summary>
+    private static void SetValueOrMixed(NumericUpDown control, IReadOnlyList<decimal> values)
+    {
+        if (values.Distinct().Count() == 1)
+        {
+            control.Value = values[0];
+            control.PlaceholderText = string.Empty;
+        }
+        else
+        {
+            control.Value = null;
+            control.PlaceholderText = "(mixed)";
+        }
+    }
+
     private void RefreshPropertyPanel()
     {
         _suppressPropRefresh = true;
@@ -3813,32 +3831,54 @@ public partial class MainWindow : Window
 
             if (frame is not null && !hasShapeSelection)
             {
-                PropFlipH.IsChecked  = frame.FlipHorizontal;
-                PropFlipV.IsChecked  = frame.FlipVertical;
-                PropFrameLen.Value   = (decimal)frame.FrameLength;
-                PropRelX.Value       = (decimal)frame.RelativeX;
-                PropRelY.Value       = (decimal)frame.RelativeY;
-                PropRed.Value        = frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null;
-                PropGreen.Value      = frame.Green.HasValue ? frame.Green.Value : (decimal?)null;
-                PropBlue.Value       = frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null;
-                PropAlpha.Value      = frame.Alpha.HasValue ? frame.Alpha.Value : (decimal?)null;
+                // When multiple frames are selected and disagree on a property, show that field
+                // blank with a "(mixed)" placeholder instead of one frame's value (issue #571) —
+                // editing it then applies the new value to every selected frame; leaving it blank
+                // applies nothing (see the `!PropXxx.Value.HasValue` guards in the Apply* methods).
+                var frames = _selectedState.SelectedFrames;
+
+                bool flipHMixed = frames.Select(f => f.FlipHorizontal).Distinct().Count() > 1;
+                bool flipVMixed = frames.Select(f => f.FlipVertical).Distinct().Count() > 1;
+                PropFlipH.IsChecked = flipHMixed ? null : frame.FlipHorizontal;
+                PropFlipV.IsChecked = flipVMixed ? null : frame.FlipVertical;
+
+                SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
+                SetValueOrMixed(PropRelX, frames.Select(f => (decimal)f.RelativeX).ToList());
+                SetValueOrMixed(PropRelY, frames.Select(f => (decimal)f.RelativeY).ToList());
+
+                bool redMixed   = frames.Select(f => f.Red).Distinct().Count() > 1;
+                bool greenMixed = frames.Select(f => f.Green).Distinct().Count() > 1;
+                bool blueMixed  = frames.Select(f => f.Blue).Distinct().Count() > 1;
+                bool alphaMixed = frames.Select(f => f.Alpha).Distinct().Count() > 1;
+                bool opMixed    = frames.Select(f => f.ColorOperation).Distinct().Count() > 1;
+
+                PropRed.Value   = redMixed   ? null : (frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null);
+                PropGreen.Value = greenMixed ? null : (frame.Green.HasValue ? frame.Green.Value : (decimal?)null);
+                PropBlue.Value  = blueMixed  ? null : (frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null);
+                PropAlpha.Value = alphaMixed ? null : (frame.Alpha.HasValue ? frame.Alpha.Value : (decimal?)null);
 
                 // Ghost the sticky effective value in each blank field: an omitted channel holds
                 // whatever an earlier frame last set (climbing back), or the operation's identity
                 // (Add → 0, else 255) when nothing ever set it. This makes a blank field read as the
-                // value a runtime actually applies, instead of implying "reset to default".
+                // value a runtime actually applies, instead of implying "reset to default". Mixed
+                // takes priority — it means the selection disagrees, not that a value is inherited.
                 var chain = _selectedState.SelectedChain;
                 int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
                 var effective = frameIndex >= 0
                     ? EffectiveFrameColor.Resolve(chain!.Frames, frameIndex)
                     : default;
                 int rgbDefault = EffectiveFrameColor.ChannelDefault(effective.Operation);
-                PropRed.PlaceholderText   = (effective.Red   ?? rgbDefault).ToString();
-                PropGreen.PlaceholderText = (effective.Green ?? rgbDefault).ToString();
-                PropBlue.PlaceholderText  = (effective.Blue  ?? rgbDefault).ToString();
-                PropAlpha.PlaceholderText = (effective.Alpha ?? 255).ToString();
+                PropRed.PlaceholderText   = redMixed   ? "(mixed)" : (effective.Red   ?? rgbDefault).ToString();
+                PropGreen.PlaceholderText = greenMixed ? "(mixed)" : (effective.Green ?? rgbDefault).ToString();
+                PropBlue.PlaceholderText  = blueMixed  ? "(mixed)" : (effective.Blue  ?? rgbDefault).ToString();
+                PropAlpha.PlaceholderText = alphaMixed ? "(mixed)" : (effective.Alpha ?? 255).ToString();
 
-                if (frame.ColorOperation is ColorOperation op)
+                if (opMixed)
+                {
+                    PropColorMode.SelectedIndex = -1;
+                    PropColorMode.PlaceholderText = "(mixed)";
+                }
+                else if (frame.ColorOperation is ColorOperation op)
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
@@ -3859,10 +3899,10 @@ public partial class MainWindow : Window
                 var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
                 if (bmpW > 0 && bmpH > 0)
                 {
-                    PropPixelX.Value = FrameDisplayValues.GetPixelX(frame, bmpW);
-                    PropPixelY.Value = FrameDisplayValues.GetPixelY(frame, bmpH);
-                    PropPixelW.Value = FrameDisplayValues.GetPixelWidth(frame, bmpW);
-                    PropPixelH.Value = FrameDisplayValues.GetPixelHeight(frame, bmpH);
+                    SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f, bmpW)).ToList());
+                    SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f, bmpH)).ToList());
+                    SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f, bmpW)).ToList());
+                    SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f, bmpH)).ToList());
                 }
             }
 
@@ -3894,40 +3934,49 @@ public partial class MainWindow : Window
     private void ApplyFrameFlip()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-        // Route through the undoable flip commands. FlipFrame* toggles, so only call
-        // it when the toggle button's state actually differs from the model.
-        if (frame.FlipHorizontal != (PropFlipH.IsChecked == true))
-            _appCommands.FlipFrameHorizontally(frame);
-        if (frame.FlipVertical != (PropFlipV.IsChecked == true))
-            _appCommands.FlipFrameVertically(frame);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
+        // ToggleButton.IsChecked is already nullable: null means the checkbox is showing the
+        // mixed/indeterminate state (the selection disagrees and the user didn't touch it), so
+        // it passes straight through as "leave this axis untouched".
+        _appCommands.SetFrameFlip(frames, PropFlipH.IsChecked, PropFlipV.IsChecked);
     }
 
     private void ApplyFrameLen()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null || !PropFrameLen.Value.HasValue) return;
-        _appCommands.SetFrameLength(frame, (float)PropFrameLen.Value.Value);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0 || !PropFrameLen.Value.HasValue) return;
+        _appCommands.SetFrameLength(frames, (float)PropFrameLen.Value.Value);
     }
 
     private void ApplyFrameRelative()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null || !PropRelX.Value.HasValue || !PropRelY.Value.HasValue) return;
-        _appCommands.SetFrameRelative(frame, (float)PropRelX.Value.Value, (float)PropRelY.Value.Value);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
+        // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
+        // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
+        // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
+        float? relX = PropRelX.Value.HasValue ? (float)PropRelX.Value.Value : null;
+        float? relY = PropRelY.Value.HasValue ? (float)PropRelY.Value.Value : null;
+        if (relX is null && relY is null) return;
+        _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
     private void ApplyFrameColor()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
+        // Note: with a multi-selection, a channel that is still showing its "(mixed)" placeholder
+        // also reads as null here, so it gets applied (cleared) to every selected frame just like an
+        // explicit clear would — there's no way to tell "never touched" apart from "cleared on purpose"
+        // from the control's Value alone. Prefer not leaving a mixed color panel blank across an edit
+        // if that distinction matters; see PR notes for the known limitation.
         static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
-        _appCommands.SetFrameColor(frame, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
+        _appCommands.SetFrameColor(frames, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
     }
 
     private void CommitColorChannelOnEnter(KeyEventArgs e)
@@ -3938,17 +3987,17 @@ public partial class MainWindow : Window
     private void ApplyFrameAlpha()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // A blank NumericUpDown (null Value) means alpha is unset and is omitted from the .achx.
-        _appCommands.SetFrameAlpha(frame, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
+        _appCommands.SetFrameAlpha(frames, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
     }
 
     private void ApplyFrameColorOperation()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
         ColorOperation? operation = PropColorMode.SelectedIndex switch
         {
@@ -3956,22 +4005,25 @@ public partial class MainWindow : Window
             2 => ColorOperation.Add,
             _ => null,
         };
-        _appCommands.SetFrameColorOperation(frame, operation);
+        _appCommands.SetFrameColorOperation(frames, operation);
     }
 
     private void ApplyFramePixelCoords()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
         if (bmpW <= 0 || bmpH <= 0) return;
-        if (!PropPixelX.Value.HasValue || !PropPixelY.Value.HasValue ||
-            !PropPixelW.Value.HasValue || !PropPixelH.Value.HasValue) return;
-        _appCommands.SetFramePixelRegion(frame,
-            (int)PropPixelX.Value.Value, (int)PropPixelY.Value.Value,
-            (int)PropPixelW.Value.Value, (int)PropPixelH.Value.Value,
-            bmpW, bmpH);
+        // A null component here only ever means "still showing (mixed), not edited" — the pixel
+        // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
+        // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
+        int? x = PropPixelX.Value.HasValue ? (int)PropPixelX.Value.Value : null;
+        int? y = PropPixelY.Value.HasValue ? (int)PropPixelY.Value.Value : null;
+        int? w = PropPixelW.Value.HasValue ? (int)PropPixelW.Value.Value : null;
+        int? h = PropPixelH.Value.HasValue ? (int)PropPixelH.Value.Value : null;
+        if (x is null && y is null && w is null && h is null) return;
+        _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
     }
 
