@@ -1841,19 +1841,19 @@ public class WireframeControl : Control
         }
 
         // Single chain or multi-chain composite Move handle: grab any visible frame to
-        // drag the whole group together. Tested against each individual frame's rect
-        // (not the union bounding box) so a point in a gap between non-tiling frames
-        // — still inside the overall bounding box — is correctly not a hit (issue #587).
-        // All hits are treated as Move since resizing the group via the bounding rect is not supported.
+        // drag the whole group together. Tested against each individual frame's actual
+        // body (not the union bounding box, and no handle-offset expansion) so a point
+        // in a gap between non-tiling frames — even a narrow gap between two frames
+        // whose expanded handle-hit zones would otherwise overlap — is correctly not a
+        // hit (issue #587). All hits are treated as Move since resizing the group via
+        // the bounding rect is not supported, so there's no need to test handle zones.
         if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
         {
             bool overAnyFrame = _frameRects.Any(fr =>
             {
                 var sr = ToScreen(fr.Bounds);
-                return DragHandleHitTester.GetHandleAt(
-                    (float)pos.X, (float)pos.Y,
-                    sr.Left, sr.Top, sr.Right, sr.Bottom,
-                    handleOffset: 5f) != HandleKind.None;
+                return pos.X >= sr.Left && pos.X <= sr.Right &&
+                       pos.Y >= sr.Top  && pos.Y <= sr.Bottom;
             });
 
             if (overAnyFrame)

@@ -121,4 +121,70 @@ public class WireframeCursorHitTestTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Builds a WireframeControl with two vertically-stacked frames separated by a
+    /// narrow (10px) gap, the parent chain selected, no individual frame selected.
+    /// Frame A (top):    pixels (0, 0, 40, 40)  — UV (0.00, 0.00, 0.40, 0.40)
+    /// Frame B (bottom):  pixels (0, 50, 40, 90) — UV (0.00, 0.50, 0.40, 0.90)
+    /// </summary>
+    private static (WireframeControl ctrl, string dir) BuildCtrlWithNarrowGapFrames(TestServices ctx)
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.DarkGray, name: "sprite.png");
+
+        var frameA = new AnimationFrameSave
+        {
+            TextureName      = "sprite.png",
+            FrameLength      = 0.1f,
+            LeftCoordinate   = 0.0f, TopCoordinate    = 0.0f,
+            RightCoordinate  = 0.4f, BottomCoordinate = 0.4f,
+            ShapesSave = new ShapesSave(),
+        };
+        var frameB = new AnimationFrameSave
+        {
+            TextureName      = "sprite.png",
+            FrameLength      = 0.1f,
+            LeftCoordinate   = 0.0f, TopCoordinate    = 0.5f,
+            RightCoordinate  = 0.4f, BottomCoordinate = 0.9f,
+            ShapesSave = new ShapesSave(),
+        };
+
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(frameA);
+        chain.Frames.Add(frameB);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        // Select the chain — no individual frame selected
+        ctx.SelectedState.SelectedChain = chain;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0f, 0f, 1f);
+        ctrl.RefreshFrames();
+
+        return (ctrl, dir);
+    }
+
+    /// <summary>
+    /// Regression guard: with a narrow (10px) gap between two selected frames, the
+    /// combined reach of each frame's resize-handle hit zone (5px handle offset + 7px
+    /// hit radius = 12px) previously bled into the gap between them, so the cursor at
+    /// the gap's midpoint still resolved to a hit. Only actual frame bodies should hit.
+    /// </summary>
+    [AvaloniaFact]
+    public void NarrowGapBetweenStackedSelectedFrames_HitTestReturnsNone()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrlWithNarrowGapFrames(ctx);
+        try
+        {
+            // Midpoint of the 10px gap between frame A's bottom (y=40) and frame B's top (y=50).
+            var handle = ctrl.HitTestHandleKindAt(20f, 45f);
+            Assert.Equal(HandleKind.None, handle);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }
