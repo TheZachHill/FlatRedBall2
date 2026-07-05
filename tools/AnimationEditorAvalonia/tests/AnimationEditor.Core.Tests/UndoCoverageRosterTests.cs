@@ -91,6 +91,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.InvertFrameOrder)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetAllFrameLengths)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateChain)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.DuplicateChains)]              = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateFrame)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateShape)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SortAnimationsAlphabetically)] = Category.MutatingUndoable,
@@ -269,6 +270,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetAllFrameLengths(Zebra(ctx), 0.5f)));
         yield return Row(nameof(IAppCommands.DuplicateChain),
             ctx => Sync(() => ctx.AppCommands.DuplicateChain(Zebra(ctx))));
+        yield return Row(nameof(IAppCommands.DuplicateChains),
+            ctx => Sync(() => ctx.AppCommands.DuplicateChains(new[] { Zebra(ctx) })));
         yield return Row(nameof(IAppCommands.DuplicateFrame),
             ctx => Sync(() => ctx.AppCommands.DuplicateFrame(Zebra(ctx).Frames[0], Zebra(ctx))));
         yield return Row(nameof(IAppCommands.DuplicateShape),
