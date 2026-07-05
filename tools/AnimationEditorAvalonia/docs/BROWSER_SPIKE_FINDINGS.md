@@ -1,4 +1,4 @@
-# #535 M1/M2/M3 Spike Findings — Animation Editor on Avalonia.Browser (WASM)
+# #535 M1/M2/M3/M4 Spike Findings — Animation Editor on Avalonia.Browser (WASM)
 
 Tracking issue: [vchelaru/FlatRedBall2#535](https://github.com/vchelaru/FlatRedBall2/issues/535).
 
@@ -266,3 +266,65 @@ button. Verified: the diff logic via unit tests, and the app still builds and
 the bundled sample still loads with the new UI. Not verified, same reason as
 Open Folder/Save As above: exercising a real folder pick + external file edit
 needs the native OS folder picker, which no tool in this environment can drive.
+
+## M4 (deploy) — workflow + load indicator + bundle size measured; deploy not triggered
+
+M4 asked for a GitHub Actions → Pages workflow with the correct base-href
+subpath and a load indicator, plus measuring bundle size / first load. Scoped
+deliberately to *writing* these (local, reversible commits) without actually
+running a deploy to the repo's public Pages site — that's a separate,
+explicit step for whoever's ready to make this live.
+
+**Bundle size** (`dotnet publish -c Release`, measured locally, verified
+reproducible):
+
+| | Size |
+|---|---|
+| Total `wwwroot` | 34 MB |
+| Raw `.wasm`/`.dll` in `_framework` | 18 MB |
+| Brotli-compressed (what a browser actually fetches) | **5.7 MB** |
+| File count in `_framework` | 159 |
+
+The workflow (below) reports these same three numbers to the GitHub Actions
+run summary on every deploy, so bundle-size drift is visible without digging
+through logs.
+
+**Load indicator.** Checked whether Avalonia.Browser has a built-in
+splash-screen convention first — it doesn't, at least not in 12.0.1: grepped
+the actual shipped `avalonia.js` for `avalonia-splash`/`splash-close` (the
+class names the `dotnet new avalonia.xplat` template's CSS references) and
+found zero matches, so that CSS is unused boilerplate in the scaffold, not a
+real mechanism. Built one instead — a centered spinner + "Loading Animation
+Editor…" message, placed inside `#out`. First attempt assumed Avalonia
+*replaces* `#out`'s children when it attaches (mirroring what M1 assumed about
+the native-host div); that was wrong here too — confirmed by checking the DOM
+directly, Avalonia *appends* its canvas/native-host/input elements as
+additional siblings, so the loading div (opaque, `position:absolute;inset:0`,
+added first) ends up on top forever once appended-after content stacks over
+it. Fixed with a small `MutationObserver` in `main.js` watching `#out` for the
+canvas to appear, then removing the loading div — `runMain()` never resolves
+for a long-lived SPA, so there's no "app is ready" promise to hang this off
+instead. Verified in a real browser tab: the spinner shows immediately, and
+`document.getElementById('loading')` returns `null` once the canvas exists,
+confirming actual removal, not just visual covering.
+
+**GitHub Actions workflow.** `.github/workflows/deploy-animation-editor-web.yml`,
+`workflow_dispatch`-only (not on every push — this is still an early spike).
+Mirrors the repo's existing `deploy-sample.yml` (which already deploys the
+BlazorGL game samples to Pages: base-href rewrite via `sed`, `.nojekyll`,
+stripping stray `.gitignore` files before `peaceiris/actions-gh-pages`'
+internal `git add`, `keep_files: true` so other Pages content under different
+`destination_dir`s survives each other's deploys) with one addition that
+project's KNI/BlazorGL samples don't need: installing the `wasm-tools`
+workload, since this project uses Microsoft's official
+`Microsoft.NET.Sdk.WebAssembly` rather than KNI. Deploys to
+`gh-pages/AnimationEditor`, base href `/FlatRedBall2/AnimationEditor/`.
+Verified locally (not in CI): published in Release config, confirmed the
+`sed` rewrite matches `<base href="./" />` (added to `index.html` for exactly
+this) and produces the expected `/FlatRedBall2/AnimationEditor/`, and
+reproduced the same bundle-size numbers above from that publish output.
+
+**Not done, by design:** the workflow has not been run. `workflow_dispatch`
+means it only executes when someone explicitly triggers it — deploying real
+content to the repo's public GitHub Pages site is a deliberate, separate
+action from writing the deploy mechanism.
