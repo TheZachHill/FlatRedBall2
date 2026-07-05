@@ -5,8 +5,8 @@ namespace FlatRedBall2.Animation.Content;
 
 /// <summary>
 /// Per-frame shape definitions in a .achx file. Inert in FRB1; live in FRB2 — entries are
-/// converted to runtime <see cref="AnimationShapeFrame"/> instances by
-/// <see cref="AnimationChainListSave.ToAnimationChainList"/>.
+/// converted to runtime <c>AnimationShapeFrame</c> instances by
+/// <c>AnimationChainListSaveExtensions.ToAnimationChainList</c> (main engine assembly).
 /// </summary>
 /// <remarks>Serialized as <c>&lt;ShapeCollectionSave&gt;</c> in .achx XML.</remarks>
 public class ShapesSave

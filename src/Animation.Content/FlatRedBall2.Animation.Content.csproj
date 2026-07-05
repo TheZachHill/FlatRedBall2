@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The .achx data model: pure C#, zero MonoGame/KNI dependency by design. Split out of the main
+    FlatRedBall2 engine assembly so tooling that only needs the file format (the Animation Editor,
+    an Avalonia app, not a MonoGame one) can reference just this project instead of the whole
+    engine. See tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md for the motivating
+    #535 investigation. The runtime bridge (converting these types into engine AnimationChainList/
+    AnimationFrame objects backed by real Texture2D instances) lives in the main engine project,
+    in AnimationChainListSaveExtensions; that's the only part that actually needs MonoGame.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

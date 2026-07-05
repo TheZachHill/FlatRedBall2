@@ -39,7 +39,7 @@ public class AnimationFrameSave
     /// Optional per-frame red channel, 0–255. <c>null</c> (the default) means unset, so it is
     /// omitted from the saved <c>.achx</c>. The Animation Editor previews these as a reference tint
     /// (via <see cref="ColorOperation"/>); the FlatRedBall2 runtime does <b>not</b> auto-apply them —
-    /// game code reads them via <see cref="FlatRedBall2.Rendering.Sprite.CurrentFrame"/> and decides how
+    /// game code reads them via <c>FlatRedBall2.Rendering.Sprite.CurrentFrame</c> and decides how
     /// to use them (tint, flash, etc.). See <see cref="Green"/>, <see cref="Blue"/>.
     /// </summary>
     public int? Red;
@@ -54,7 +54,7 @@ public class AnimationFrameSave
     /// Optional per-frame alpha (transparency) channel, 0–255. <c>null</c> (the default) means unset, so it
     /// is omitted from the saved <c>.achx</c>. Straight transparency, independent of <see cref="ColorOperation"/>.
     /// The Animation Editor previews it as opacity (a reference render); the FlatRedBall2 runtime does <b>not</b>
-    /// auto-apply it — game code reads it via <see cref="FlatRedBall2.Rendering.Sprite.CurrentFrame"/>. See <see cref="Red"/>.
+    /// auto-apply it — game code reads it via <c>FlatRedBall2.Rendering.Sprite.CurrentFrame</c>. See <see cref="Red"/>.
     /// </summary>
     public int? Alpha;
 

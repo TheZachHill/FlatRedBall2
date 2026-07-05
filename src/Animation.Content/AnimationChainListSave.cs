@@ -5,8 +5,6 @@ using System.IO;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -37,7 +35,9 @@ public enum TextureCoordinateType
 /// <summary>
 /// Deserialized representation of a .achx animation file.
 /// Load with <see cref="FromFile(string)"/> and convert to runtime types with
-/// <see cref="ToAnimationChainList"/>.
+/// <c>ToAnimationChainList</c> (an extension method in the main FlatRedBall2 engine
+/// assembly — this type itself has no MonoGame dependency so tooling, like the
+/// Animation Editor, can reference it without pulling MonoGame in at all).
 /// </summary>
 public class AnimationChainListSave
 {
@@ -68,7 +68,7 @@ public class AnimationChainListSave
     /// <summary>
     /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
     /// for tooling (file pickers in the Animation Editor) where the caller has an absolute path
-    /// and needs to bypass the <see cref="ContentLoader"/> stream seam. Production runtime code
+    /// and needs to bypass the <c>ContentLoader</c> stream seam. Production runtime code
     /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
     /// to the other overload.
     /// </summary>
@@ -79,7 +79,7 @@ public class AnimationChainListSave
     /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer
     /// <c>ContentLoader.LoadAnimationChainList(path)</c>, which routes the read through
     /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
-    /// overload exists for tooling and tests that work without a <see cref="ContentLoader"/>.
+    /// overload exists for tooling and tests that work without a <c>ContentLoader</c>.
     /// </summary>
     /// <param name="filePath">Path to the .achx file, interpreted by <paramref name="streamProvider"/>.</param>
     /// <param name="streamProvider">Byte source. Callers must supply one — there is no default — so this
@@ -449,148 +449,5 @@ public class AnimationChainListSave
     {
         var el = parent.Element(name);
         return el != null ? Enum.Parse<ColorOperation>(el.Value) : null;
-    }
-
-    /// <summary>
-    /// Converts this save object to a runtime <see cref="AnimationChainList"/>, loading
-    /// all referenced textures through <see cref="ContentLoader.Load{T}"/>.
-    /// Texture paths are passed as-is: if the frame's <c>TextureName</c> includes an
-    /// extension (e.g. <c>"Player.png"</c>), it loads directly from disk and participates
-    /// in PNG hot-reload via <see cref="ContentLoader.TryReload"/>; if there is
-    /// no extension, it goes through MonoGame's compiled xnb pipeline (not hot-reloadable).
-    /// </summary>
-    /// <remarks>
-    /// Texture names are resolved relative to the .achx file location when
-    /// <see cref="FileRelativeTextures"/> is <c>true</c>.
-    /// </remarks>
-    public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentLoader contentManager)
-    {
-        string achxDir = string.IsNullOrEmpty(FileName) ? "" : Path.GetDirectoryName(FileName) ?? "";
-
-        return BuildList(frameSave =>
-        {
-            if (string.IsNullOrEmpty(frameSave.TextureName)) return null;
-
-            string texPath = FileRelativeTextures && !string.IsNullOrEmpty(achxDir)
-                ? Path.Combine(achxDir, frameSave.TextureName)
-                : frameSave.TextureName;
-
-            return contentManager.Load<Texture2D>(texPath.Replace('\\', '/'));
-        });
-    }
-
-    // Shared chain-building logic; loadTexture maps a save frame to its Texture2D (or null).
-    private AnimationChainList BuildList(Func<AnimationFrameSave, Texture2D?> loadTexture)
-    {
-        float frameLengthDivisor = TimeMeasurementUnit == TimeMeasurementUnit.Millisecond ? 1000f : 1f;
-        var list = new AnimationChainList { Name = FileName };
-
-        foreach (var chainSave in AnimationChains)
-        {
-            var chain = new AnimationChain { Name = chainSave.Name };
-
-            foreach (var frameSave in chainSave.Frames)
-            {
-                var frame = new AnimationFrame
-                {
-                    TextureName = frameSave.TextureName,
-                    FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
-                    FlipHorizontal = frameSave.FlipHorizontal,
-                    FlipVertical = frameSave.FlipVertical,
-                    RelativeX = frameSave.RelativeX,
-                    RelativeY = frameSave.RelativeY,
-                    Red = frameSave.Red,
-                    Green = frameSave.Green,
-                    Blue = frameSave.Blue,
-                    Alpha = frameSave.Alpha,
-                    ColorOperation = frameSave.ColorOperation,
-                };
-
-                frame.Texture = loadTexture(frameSave);
-
-                if (frame.Texture != null)
-                {
-                    int left, top, width, height;
-                    if (CoordinateType == TextureCoordinateType.Pixel)
-                    {
-                        left   = (int)frameSave.LeftCoordinate;
-                        top    = (int)frameSave.TopCoordinate;
-                        width  = (int)(frameSave.RightCoordinate  - frameSave.LeftCoordinate);
-                        height = (int)(frameSave.BottomCoordinate - frameSave.TopCoordinate);
-                    }
-                    else // UV
-                    {
-                        left   = (int)(frameSave.LeftCoordinate   * frame.Texture.Width);
-                        top    = (int)(frameSave.TopCoordinate    * frame.Texture.Height);
-                        width  = (int)((frameSave.RightCoordinate  - frameSave.LeftCoordinate) * frame.Texture.Width);
-                        height = (int)((frameSave.BottomCoordinate - frameSave.TopCoordinate)  * frame.Texture.Height);
-                    }
-
-                    if (width > 0 && height > 0)
-                        frame.SourceRectangle = new Rectangle(left, top, width, height);
-                }
-
-                AppendShapes(frame, frameSave.ShapesSave);
-
-                chain.Add(frame);
-            }
-
-            list.Add(chain);
-        }
-
-        return list;
-    }
-
-    private static void AppendShapes(FlatRedBall2.Animation.AnimationFrame frame, ShapesSave? shapes)
-    {
-        if (shapes == null) return;
-
-        foreach (var shape in shapes.Shapes)
-        {
-            switch (shape)
-            {
-                case AARectSave rect:
-                    ValidateName(rect.Name, "AARectSave");
-                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationAARectFrame
-                    {
-                        Name = rect.Name,
-                        RelativeX = rect.X,
-                        RelativeY = rect.Y,
-                        Width = rect.ScaleX * 2f,
-                        Height = rect.ScaleY * 2f,
-                    });
-                    break;
-                case CircleSave circle:
-                    ValidateName(circle.Name, "CircleSave");
-                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationCircleFrame
-                    {
-                        Name = circle.Name,
-                        RelativeX = circle.X,
-                        RelativeY = circle.Y,
-                        Radius = circle.Radius,
-                    });
-                    break;
-                case PolygonSave poly:
-                    ValidateName(poly.Name, "PolygonSave");
-                    var points = new System.Numerics.Vector2[poly.Points.Count];
-                    for (int i = 0; i < poly.Points.Count; i++)
-                        points[i] = new System.Numerics.Vector2(poly.Points[i].X, poly.Points[i].Y);
-                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationPolygonFrame
-                    {
-                        Name = poly.Name,
-                        RelativeX = poly.X,
-                        RelativeY = poly.Y,
-                        Points = points,
-                    });
-                    break;
-            }
-        }
-    }
-
-    private static void ValidateName(string name, string elementType)
-    {
-        if (string.IsNullOrEmpty(name))
-            throw new System.InvalidOperationException(
-                $"{elementType} in .achx ShapesSave is missing a Name. Per-frame shapes must have non-empty unique names.");
     }
 }
