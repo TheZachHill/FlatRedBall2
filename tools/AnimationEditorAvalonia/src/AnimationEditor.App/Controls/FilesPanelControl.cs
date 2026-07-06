@@ -44,7 +44,6 @@ public partial class FilesPanelControl : UserControl
             RoutingStrategies.Tunnel);
         FilesTree.AddHandler(InputElement.PointerReleasedEvent, OnTreePointerReleased,
             RoutingStrategies.Tunnel);
-        FilesTree.DoubleTapped += OnTreeDoubleTapped;
         FilesTree.SelectionChanged += (_, _) => ClearTreeSelection();
 
         var contextMenu = new ContextMenu();
@@ -115,19 +114,6 @@ public partial class FilesPanelControl : UserControl
         ClearTreeSelection();
     }
 
-    private void OnTreeDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        if (GetNodeVmFromSource(e.Source) is not { IsFile: true, AbsolutePath: { } path })
-            return;
-
-        // A double-click's first press records a pending drag; clear it so the release
-        // that follows does not try to start a drag on the just-opened file.
-        _dragSourceNode = null;
-        ClearPendingDrag();
-        _openPng?.Invoke(path);
-        e.Handled = true;
-    }
-
     private void OnTreeContextMenuOpening(object? sender, CancelEventArgs e)
     {
         if (FilesTree.ContextMenu is null)
@@ -158,6 +144,18 @@ public partial class FilesPanelControl : UserControl
 
         if (GetNodeVmFromSource(e.Source) is not { IsFile: true, AbsolutePath: { } path } sourceNode)
             return;
+
+        // Double-click opens the PNG in a tab. Detected here via ClickCount rather than the
+        // DoubleTapped event: the pointer capture below (for drag-to-assign) cancels Avalonia's
+        // tap-gesture recognizer, so DoubleTapped never fires on this tree.
+        if (e.ClickCount >= 2)
+        {
+            _dragSourceNode = null;
+            ClearPendingDrag();
+            _openPng?.Invoke(path);
+            e.Handled = true;
+            return;
+        }
 
         _dragSourceNode = sourceNode;
         _dragPressEvent = e;
