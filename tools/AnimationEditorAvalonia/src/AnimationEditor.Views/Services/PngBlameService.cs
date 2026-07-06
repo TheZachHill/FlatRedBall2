@@ -37,10 +37,12 @@ public sealed class PngBlameService
     private readonly Queue<string> _decodeOrder = new();
     private const int DecodeCacheCap = 8;
 
-    // Only the most-recently-used change mask is kept: the common gesture is "pick a revision, then
-    // drag the distance slider", which reuses one mask; changing revision/tolerance replaces it.
-    private (int entryIndex, int tolerance)? _maskKey;
-    private ChangeMask? _mask;
+    // Change masks keyed by (revision, tolerance), packed (~2 MB each) so the whole history can stay
+    // cached — that's what makes revision switching and distance-slider drags instant once
+    // PrecomputeAll has run. FIFO-capped as a memory backstop for very deep histories.
+    private readonly Dictionary<(int entryIndex, int tolerance), ChangeMask> _maskCache = new();
+    private readonly Queue<(int entryIndex, int tolerance)> _maskOrder = new();
+    private const int MaskCacheCap = 48;
 
     // Serializes the two entry points: ComputeRegions runs on a background thread (MainWindow uses
     // Task.Run so a large sheet never freezes the UI), while Load runs on the UI thread on tab switch.
@@ -67,8 +69,8 @@ public sealed class PngBlameService
         _absolutePath = absolutePath;
         _decodeCache.Clear();
         _decodeOrder.Clear();
-        _maskKey = null;
-        _mask = null;
+        _maskCache.Clear();
+        _maskOrder.Clear();
 
         var history = _git.LoadHistory(absolutePath);
         _repoRoot = history.RepositoryRoot;
@@ -132,10 +134,11 @@ public sealed class PngBlameService
 
     private ChangeMask? GetOrBuildMask(int entryIndex, int tolerance)
     {
-        if (_maskKey == (entryIndex, tolerance) && _mask is not null)
+        var key = (entryIndex, tolerance);
+        if (_maskCache.TryGetValue(key, out var cachedMask))
         {
-            Debug.WriteLine($"[PngBlame] mask entry={entryIndex} tol={tolerance}: CACHE HIT (slider-only re-merge)");
-            return _mask;
+            Debug.WriteLine($"[PngBlame] mask entry={entryIndex} tol={tolerance}: CACHE HIT");
+            return cachedMask;
         }
 
         var after = DecodeAfter(entryIndex);
@@ -144,13 +147,38 @@ public sealed class PngBlameService
             return null;
 
         var sw = Stopwatch.StartNew();
-        _mask = PixelDiff.Compute(before, after, tolerance);
-        long px = (long)_mask.Width * _mask.Height;
+        var mask = PixelDiff.Compute(before, after, tolerance);
+        long px = (long)mask.Width * mask.Height;
         Debug.WriteLine($"[PngBlame]   pixel-diff: {sw.ElapsedMilliseconds}ms " +
-            $"({_mask.Width}×{_mask.Height} = {px:N0} px)");
+            $"({mask.Width}×{mask.Height} = {px:N0} px)");
 
-        _maskKey = (entryIndex, tolerance);
-        return _mask;
+        _maskCache[key] = mask;
+        _maskOrder.Enqueue(key);
+        if (_maskOrder.Count > MaskCacheCap)
+            _maskCache.Remove(_maskOrder.Dequeue());
+        return mask;
+    }
+
+    /// <summary>
+    /// Warms the mask cache for every revision at <paramref name="tolerance"/>, so subsequent revision
+    /// clicks and distance-slider drags are instant. Intended to run on a background thread right after
+    /// <see cref="Load"/>. Locks per revision (not for the whole run) so a user's on-demand click can
+    /// interleave, and bails early when <paramref name="isCancelled"/> returns true (e.g. the user
+    /// switched to a different PNG). Revisions are warmed newest-first to match the visible list order.
+    /// </summary>
+    public void PrecomputeAll(int tolerance, Func<bool> isCancelled)
+    {
+        for (int i = 0; ; i++)
+        {
+            if (isCancelled())
+                return;
+            lock (_computeLock)
+            {
+                if (i >= _entries.Count)
+                    return;
+                GetOrBuildMask(i, tolerance);
+            }
+        }
     }
 
     // "After" is this entry's own content: the on-disk file for the working-tree entry, else the blob.

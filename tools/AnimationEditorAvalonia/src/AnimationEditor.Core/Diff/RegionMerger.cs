@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace AnimationEditor.Core.Diff;
 
@@ -31,23 +32,31 @@ public static class RegionMerger
         int cellSize = Math.Max(1, distanceThreshold);
         int width = mask.Width;
         int cols = (width + cellSize - 1) / cellSize;
-        var changed = mask.Changed;
+        var bits = mask.Bits;
 
         // One accumulator per occupied grid cell (sparse — only cells with a changed pixel), keyed
         // by cell index cy*cols + cx. Each holds the tight pixel bounds and count within that cell.
-        // Scan the mask linearly and derive (x, y) only for pixels that actually changed, so a sheet
-        // with a few thousand changed pixels doesn't pay for a full W×H nested-loop scan (#606).
+        // Scan the packed bitset a word at a time, skipping 64 unchanged pixels per zero word, and
+        // derive (x, y) only for pixels that actually changed — so a few-thousand-pixel change on a
+        // multi-megapixel sheet costs almost nothing (#606).
         var cells = new Dictionary<int, Accum>();
-        for (int idx = 0; idx < changed.Length; idx++)
+        for (int w = 0; w < bits.Length; w++)
         {
-            if (!changed[idx]) continue;
-            int x = idx % width;
-            int y = idx / width;
-            int key = (y / cellSize) * cols + (x / cellSize);
-            if (cells.TryGetValue(key, out var acc))
-                cells[key] = acc.Add(x, y);
-            else
-                cells[key] = new Accum(x, y, x, y, 1);
+            ulong word = bits[w];
+            int baseIdx = w << 6;
+            while (word != 0)
+            {
+                int idx = baseIdx + BitOperations.TrailingZeroCount(word);
+                word &= word - 1;   // clear the lowest set bit
+
+                int x = idx % width;
+                int y = idx / width;
+                int key = (y / cellSize) * cols + (x / cellSize);
+                if (cells.TryGetValue(key, out var acc))
+                    cells[key] = acc.Add(x, y);
+                else
+                    cells[key] = new Accum(x, y, x, y, 1);
+            }
         }
 
         if (cells.Count == 0)
