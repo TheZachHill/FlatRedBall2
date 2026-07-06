@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/external/">
-    <Project Path="../../src/FlatRedBall2.csproj" />
+    <Project Path="../../src/Animation.Content/FlatRedBall2.Animation.Content.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AnimationEditor.Core/AnimationEditor.Core.csproj" />
+    <Project Path="src/AnimationEditor.Views/AnimationEditor.Views.csproj" />
+    <Project Path="src/AnimationEditor.Browser/AnimationEditor.Browser.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj" />

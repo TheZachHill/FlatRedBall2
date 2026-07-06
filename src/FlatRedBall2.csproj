@@ -47,15 +47,26 @@
       The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
       this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
       compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
-      reference the AspNetCore.Components / JSInterop assemblies.
+      reference the AspNetCore.Components / JSInterop assemblies. Animation.Content is its own
+      MonoGame-free project (see ProjectReference below) for the same reason.
     -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;Animation.Content\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->
   <ItemGroup>
     <PackageReference Include="AsepriteDotNet" Version="1.9.1" />
     <PackageReference Include="FlatRedBall.InterpolationCore" Version="2025.4.22.1" />
+  </ItemGroup>
+
+  <!--
+    The .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave, ColorOperation,
+    etc.) has no MonoGame dependency, so it lives in its own project. This lets tooling like the
+    Animation Editor (Avalonia, not MonoGame) reference the .achx format without pulling in
+    MonoGame.Framework.DesktopGL at all; see tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="Animation.Content/FlatRedBall2.Animation.Content.csproj" />
   </ItemGroup>
 
   <!-- MonoGame backend -->

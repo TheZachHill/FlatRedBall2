@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+
+  <!--
+    #535 M1 (rendering spike, closed) + M2 (content without FS): a bundled sample .achx +
+    PNG under wwwroot/sample/ is fetched over HTTP (no local filesystem) and played back
+    through the real AnimationEditor.Views PreviewControl, not a stand-in. See
+    docs/BROWSER_SPIKE_FINDINGS.md.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Browser" Version="12.0.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
+    <ProjectReference Include="..\AnimationEditor.Views\AnimationEditor.Views.csproj" />
+  </ItemGroup>
+
+</Project>
