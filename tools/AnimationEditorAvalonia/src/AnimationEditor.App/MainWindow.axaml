@@ -1586,24 +1586,33 @@
                  the pan directly (overlaid + auto-hide), mirroring the wireframe panel. -->
             <Grid x:Name="PngPaneGrid" Grid.Column="2" RowDefinitions="Auto,*"
                   Background="{DynamicResource BgCanvas}" IsVisible="False">
-                <!-- Diff controls bar (#606): affects the PNG's change-box display, not the tree, so it
-                     lives here above the image (like the editor's grid toolbar). One knob — "Grouping" —
-                     with a solid default; most users never touch it. Tolerance is fixed in code. -->
+                <!-- PNG toolbar (#606): a thin bar the same height as the editor's toolbar. Left: the
+                     lone "Grouping" knob (affects the change-box display, not the tree). Right: the
+                     current zoom, handy for taking 1:1 screenshots. Tolerance is fixed in code. -->
                 <Border Grid.Row="0" Background="{DynamicResource BgRail}"
                         BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
                         Padding="8,3">
-                    <StackPanel Orientation="Horizontal" Spacing="6"
-                                HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource InkMid}" />
-                        <Slider x:Name="DiffGroupingSlider" Width="160" VerticalAlignment="Center"
-                                Minimum="1" Maximum="128" Value="16"
-                                SmallChange="1" LargeChange="8"
-                                ToolTip.Tip="How close changed pixels must be to group into one highlighted box. Higher = fewer, larger boxes. Rarely needs changing." />
-                        <TextBlock x:Name="DiffGroupingValue" Text="16" FontSize="11"
-                                   MinWidth="20" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource Ink}" />
-                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" />
+                            <!-- Height + MinHeight 0 override Fluent's tall default so the bar matches
+                                 the editor toolbar's height (#501-style override). -->
+                            <Slider x:Name="DiffGroupingSlider" Width="160" Height="24" MinHeight="0"
+                                    VerticalAlignment="Center"
+                                    Minimum="1" Maximum="128" Value="16"
+                                    SmallChange="1" LargeChange="8"
+                                    ToolTip.Tip="How close changed pixels must be to group into one highlighted box. Higher = fewer, larger boxes. Rarely needs changing." />
+                            <TextBlock x:Name="DiffGroupingValue" Text="16" FontSize="11"
+                                       MinWidth="20" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Ink}" />
+                        </StackPanel>
+                        <TextBlock x:Name="DiffZoomValue" Grid.Column="2" Text="100%" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"
+                                   Foreground="{DynamicResource InkMid}"
+                                   ToolTip.Tip="Current zoom. Scroll to zoom; 100% is 1:1 pixels (useful for screenshots)." />
+                    </Grid>
                 </Border>
 
                 <views:PngPreviewControl x:Name="PngPane" Grid.Row="1" />

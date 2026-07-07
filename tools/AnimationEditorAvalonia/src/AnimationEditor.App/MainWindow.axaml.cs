@@ -1140,7 +1140,13 @@ public partial class MainWindow : Window
         PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
         PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
         PngPane.ViewChanged += RefreshPngScrollBars;
+        PngPane.ViewChanged += UpdatePngZoomLabel;
     }
+
+    // Reflects the PNG viewer's zoom (1.0 = 100%) in the toolbar readout, so 1:1 is easy to hit for
+    // screenshots. Fires on every camera change (pan/zoom/load).
+    private void UpdatePngZoomLabel() =>
+        DiffZoomValue.Text = $"{PngPane.Zoom * 100f:F0}%";
 
     private void OnPngScrollValueChanged(bool horizontal)
     {
