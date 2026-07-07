@@ -228,6 +228,27 @@ public class StatusBarTests
     }
 
     [AvaloniaFact]
+    public void StatusBar_ShowsSelectedCount_WhenMultipleChainsSelected()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var walk = new AnimationChainSave { Name = "Walk" };
+            var run  = new AnimationChainSave { Name = "Run" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(run);
+
+            // Selecting 2+ chains replaces the whole-file summary with just the count (#623).
+            ctx.SelectedState.SelectedNodes = new() { walk, run };
+            Dispatcher.UIThread.RunJobs();
+
+            var counts = window.FindControl<TextBlock>("StatusCounts")!;
+            Assert.Equal("2 chains selected", counts.Text);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void StatusBar_ShowsAutoSaveFailed_AfterMarkSaveFailed()
     {
         var (window, ctx) = CreateWindow();

@@ -1199,6 +1199,9 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
         // Refresh timeline strip
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        // The status counts are selection-aware (they show "N chains selected" for a
+        // multi-select), so re-run them when the selection changes (#623).
+        Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
     }
 
     // ── Companion file (.aeproperties) ────────────────────────────────────────
@@ -1296,9 +1299,16 @@ public partial class MainWindow : Window
         StatusDot.Fill       = brush;
         StatusFilename.Text  = Path.GetFileName(_projectManager.FileName ?? string.Empty);
         var acls = _projectManager.AnimationChainListSave;
+        int selectedChainCount = _selectedState.SelectedChains.Count;
         if (acls == null || acls.AnimationChains.Count == 0)
         {
             StatusCounts.Text = string.Empty;
+        }
+        else if (selectedChainCount >= 2)
+        {
+            // Multiple chains selected: a whole-file total or a per-chain breakdown is noise, so
+            // just report the selection count (#623).
+            StatusCounts.Text = $"{selectedChainCount} chains selected";
         }
         else
         {
