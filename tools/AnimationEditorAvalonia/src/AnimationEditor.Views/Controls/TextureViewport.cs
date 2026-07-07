@@ -375,6 +375,10 @@ public class TextureViewport : Control, IZoomTarget
 
     protected void RaiseViewChanged() => ViewChanged?.Invoke();
 
+    /// <summary>Raises <see cref="ZoomChanged"/> with the current zoom as a percentage, so a bound
+    /// zoom combo re-syncs. Subclasses call this after changing <see cref="_zoom"/> directly.</summary>
+    protected void RaiseZoomChanged() => ZoomChanged?.Invoke(_zoom * 100f);
+
     /// <summary>
     /// When non-null, mouse-wheel zoom steps through these preset percentages instead of
     /// applying a raw ×1.25 / ÷1.25 multiplier.  Set by <c>MainWindow</c> on startup.
@@ -1114,7 +1118,7 @@ public class TextureViewport : Control, IZoomTarget
         }
 
         InvalidateVisual();
-        ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseZoomChanged();
         RaiseViewChanged();
     }
 
