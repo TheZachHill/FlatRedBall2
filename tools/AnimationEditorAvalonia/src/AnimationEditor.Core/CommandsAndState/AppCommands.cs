@@ -607,7 +607,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var frame = new AnimationFrameSave
             {
-                TextureName  = textureName ?? string.Empty,
+                TextureName  = textureName ?? ResolveInheritedTextureName(chain, _pm.AnimationChainListSave),
                 LeftCoordinate   = 0f,
                 RightCoordinate  = 1f,
                 TopCoordinate    = 0f,
@@ -616,6 +616,30 @@ namespace AnimationEditor.Core.CommandsAndState
                 ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
             _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
+        }
+
+        /// <summary>
+        /// Picks the texture a newly added frame should inherit when the caller supplies none.
+        /// Resolution order: (1) the chain's current last frame, so a frame continues the sheet
+        /// the animation already uses; (2) the first frame with a non-empty texture from any chain
+        /// in list order, so a still-empty chain borrows a sensible default; (3) empty string when
+        /// no texture exists anywhere.
+        /// </summary>
+        public static string ResolveInheritedTextureName(
+            AnimationChainSave chain, AnimationChainListSave? chainList)
+        {
+            if (chain.Frames.Count > 0)
+                return chain.Frames[^1].TextureName;
+
+            if (chainList is not null)
+            {
+                foreach (var otherChain in chainList.AnimationChains)
+                    foreach (var frame in otherChain.Frames)
+                        if (!string.IsNullOrEmpty(frame.TextureName))
+                            return frame.TextureName;
+            }
+
+            return string.Empty;
         }
 
         public void MoveChain(AnimationChainSave chain, int delta)
