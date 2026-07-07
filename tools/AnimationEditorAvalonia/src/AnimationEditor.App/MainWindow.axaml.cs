@@ -1393,6 +1393,9 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
         // Refresh timeline strip
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        // The status counts are selection-aware (they show "N chains selected" for a
+        // multi-select), so re-run them when the selection changes (#623).
+        Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
     }
 
     // ── Companion file (.aeproperties) ────────────────────────────────────────
@@ -1490,14 +1493,22 @@ public partial class MainWindow : Window
         StatusDot.Fill       = brush;
         StatusFilename.Text  = Path.GetFileName(_projectManager.FileName ?? string.Empty);
         var acls = _projectManager.AnimationChainListSave;
+        int selectedChainCount = _selectedState.SelectedChains.Count;
         if (acls == null || acls.AnimationChains.Count == 0)
         {
             StatusCounts.Text = string.Empty;
         }
+        else if (selectedChainCount >= 2)
+        {
+            // Multiple chains selected: a whole-file total or a per-chain breakdown is noise, so
+            // just report the selection count (#623).
+            StatusCounts.Text = $"{selectedChainCount} chains selected";
+        }
         else
         {
             int totalFrames = acls.AnimationChains.Sum(c => c.Frames.Count);
-            StatusCounts.Text = $"{acls.AnimationChains.Count} chains · {totalFrames} frames";
+            string totalTime = TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(acls));
+            StatusCounts.Text = $"{acls.AnimationChains.Count} chains · {totalFrames} frames · {totalTime}";
         }
     }
 
@@ -3116,7 +3127,7 @@ public partial class MainWindow : Window
             else
             {
                 node.Header = chain.Name;
-                node.Meta   = $"{chain.Frames.Count} fr";
+                node.Meta   = TreeBuilder.BuildChainMeta(chain);
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
                 // Grow-only: keep it visible if it already was, or if it now matches.
                 node.PinnedVisible = node.PinnedVisible
@@ -3157,6 +3168,9 @@ public partial class MainWindow : Window
             frameNode.Meta       = rebuiltFrameNode.Meta;
             TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
         }
+        // The chain node's Meta carries the total play time (#623), which a frame-length edit
+        // changes — keep it in sync whenever a frame under it is refreshed.
+        chainNode.Meta = TreeBuilder.BuildChainMeta(chain);
         // A new frame/shape node must inherit its chain group's zebra parity.
         TreeBuilder.RestripeRoots(_treeRoots);
         RefreshTreeThumbnails();
@@ -3305,11 +3319,19 @@ public partial class MainWindow : Window
             new GridLength(groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight);
         if (groupActive)
         {
+            // Multiple chains have no single duration — keep the plain label (#623).
+            TimelineHeaderLabel.Text = "TIMELINE";
             RefreshGroupTimelineTracks();
             return;
         }
 
         var chain = GetTimelineChain();
+
+        // Show the active chain's total play time next to the ruler label so the duration is
+        // visible without adding up per-frame times (#623).
+        TimelineHeaderLabel.Text = chain is { Frames.Count: > 0 }
+            ? $"TIMELINE · {TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(chain))}"
+            : "TIMELINE";
 
         // Only clear-and-rebuild the cells when the frame structure (chain identity, count,
         // durations, or any thumbnail-affecting field) actually changed. A scrub that crosses a
