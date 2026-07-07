@@ -3953,6 +3953,7 @@ public partial class MainWindow : Window
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
 
         PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
+        PropTextureName.KeyDown    += (_, e) => { if (e.Key == Key.Enter) ApplyTextureName(); };
         PropTextureBrowseBtn.Click += async (_, _) => await BrowseForFrameTexture();
     }
 
@@ -3963,7 +3964,22 @@ public partial class MainWindow : Window
         if (frame is null) return;
 
         var inputText = PropTextureName.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(inputText)) return;
+
+        // Clearing the field clears the frame's texture and blanks the wireframe, rather than being
+        // ignored (which left the old texture showing). Only act when there's a texture to clear, so
+        // re-committing an already-empty field adds no spurious undo entry. SetFrameTextureName doesn't
+        // refresh the wireframe on its own, so blank it explicitly (DetermineTexturePath now resolves
+        // to no texture for the selected frame).
+        if (string.IsNullOrEmpty(inputText))
+        {
+            if (!string.IsNullOrEmpty(frame.TextureName))
+            {
+                _appCommands.SetFrameTextureName(frame, string.Empty);
+                WireframeCtrl.RefreshAll();
+                RefreshPropertyPanel();
+            }
+            return;
+        }
 
         var currentDisplay = TexturePathHelper.ComputeDisplayPath(frame.TextureName, _projectManager.FileName);
         if (inputText == currentDisplay) return;

@@ -154,4 +154,50 @@ public class WireframeEmptyFrameTextureTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Clearing the texture-name field and committing (ENTER / blur) clears the frame's texture and
+    /// blanks the wireframe, instead of being ignored so the old texture keeps showing.
+    /// </summary>
+    [AvaloniaFact]
+    public void ApplyTextureName_ClearedField_ClearsFrameTextureAndBlanksWireframe()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir, "sheet.png", 128);
+            var acls = new AnimationChainListSave();
+            var chain = new AnimationChainSave { Name = "Run" };
+            var frame = Frame(texPath);   // absolute path (unsaved project)
+            chain.Frames.Add(frame);
+            acls.AnimationChains.Add(chain);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            ctx.ProjectManager.FileName = null;
+            ctx.ProjectManager.AnimationChainListSave = acls;
+
+            var ctrl    = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var nameBox = FindCtrl<TextBox>(window, "PropTextureName");
+
+            ctx.SelectedState.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal((128, 128), ctrl.BitmapSize);
+
+            // Clear the field and commit — mirrors deleting the text and pressing ENTER.
+            nameBox.Text = "";
+            typeof(MainWindow).GetMethod("ApplyTextureName", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(string.IsNullOrEmpty(frame.TextureName), "Clearing the field should clear the frame's texture.");
+            Assert.Equal((0, 0), ctrl.BitmapSize);
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
