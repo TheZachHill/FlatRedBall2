@@ -1139,8 +1139,24 @@ public partial class MainWindow : Window
     {
         // A revision select frames + reveals the change; a slider drag just re-merges in place.
         RevisionList.SelectionChanged += (_, _) => UpdateDiffOverlay(frame: true);
+        // Re-tapping the already-selected revision doesn't fire SelectionChanged, so replay the reveal
+        // here. A tap that *changes* selection also lands here, but its SelectionChanged already bumped
+        // the latest-wins token, so this second call's compute is discarded before it paints — no
+        // double reveal. handledEventsToo: selection marks the press handled, but the tap still routes.
+        RevisionList.AddHandler(InputElement.TappedEvent, OnRevisionTapped, handledEventsToo: true);
         DiffToleranceSlider.PropertyChanged += OnDiffSliderPropertyChanged;
         DiffMergeSlider.PropertyChanged += OnDiffSliderPropertyChanged;
+    }
+
+    private void OnRevisionTapped(object? sender, TappedEventArgs e)
+    {
+        // Only when the tap landed on the currently-selected row (not empty list space).
+        if (e.Source is Avalonia.Visual v &&
+            v.FindAncestorOfType<ListBoxItem>() is { DataContext: Models.RevisionEntryVm vm } &&
+            ReferenceEquals(RevisionList.SelectedItem, vm))
+        {
+            UpdateDiffOverlay(frame: true);
+        }
     }
 
     private void OnDiffSliderPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
