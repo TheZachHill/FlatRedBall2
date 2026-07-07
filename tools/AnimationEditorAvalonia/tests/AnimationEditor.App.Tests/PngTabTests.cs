@@ -30,6 +30,19 @@ public class PngTabTests
         return path;
     }
 
+    // A real SkiaSharp-encoded PNG (the 1×1 base64 fixture above doesn't decode in this environment),
+    // for tests that assert the image actually loads.
+    private static string WriteRealPng(string dir, string fileName, int width, int height)
+    {
+        var path = Path.Combine(dir, fileName);
+        using var bmp = new SkiaSharp.SKBitmap(width, height, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Unpremul);
+        bmp.Erase(new SkiaSharp.SKColor(200, 120, 60, 255));
+        using var image = SkiaSharp.SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
     private static string WriteAchx(string dir, string fileName)
     {
         var path = Path.Combine(dir, fileName);
@@ -55,7 +68,7 @@ public class PngTabTests
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
-            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
+            await window.WhenPngTabLoaded();   // drain the off-thread git + decode before cleanup deletes dir
 
             Assert.True(window.FindControl<PngPreviewControl>("PngPane")!.IsVisible);
             Assert.False(window.FindControl<Grid>("AchxEditorPane")!.IsVisible);
@@ -84,7 +97,7 @@ public class PngTabTests
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
-            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
+            await window.WhenPngTabLoaded();   // drain the off-thread git + decode before cleanup deletes dir
             await window.OpenFileAsTab(achxPath);
             Dispatcher.UIThread.RunJobs();
 
@@ -113,7 +126,7 @@ public class PngTabTests
         {
             window.OpenPngAsTab(WritePng(dir, "sheet.png"));
             Dispatcher.UIThread.RunJobs();
-            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
+            await window.WhenPngTabLoaded();   // drain the off-thread git + decode before cleanup deletes dir
 
             Assert.False(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
             Assert.False(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
@@ -164,10 +177,40 @@ public class PngTabTests
             // The temp dir isn't a git repo, so the load resolves to a terminal status — the point is
             // that it changed off the loading state, proving the async load completed and marshaled back.
             Assert.NotEqual(loading, status.Text);
+
+            await window.WhenPngTabLoaded();   // drain the off-thread decode before cleanup deletes dir
         }
         finally
         {
             window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task LoadTextureAsync_DecodesOffThread_ShowsBlankThenImage()
+    {
+        // The image decodes off the UI thread: the control blanks synchronously (no bitmap yet) and
+        // the decoded image appears only after the awaited decode completes — so the tab can show
+        // immediately instead of stalling on a large SKBitmap.Decode.
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteRealPng(dir, "sheet.png", 3, 5);
+            var control = new PngPreviewControl();
+
+            Task<bool> load = control.LoadTextureAsync(png);
+            // Still on the UI thread here: the decode's install continuation can't have run yet.
+            Assert.Equal((0, 0), control.BitmapSize);
+
+            bool shown = await load;
+
+            Assert.True(shown);
+            Assert.Equal((3, 5), control.BitmapSize);
+        }
+        finally
+        {
             Directory.Delete(dir, true);
         }
     }
@@ -186,7 +229,7 @@ public class PngTabTests
         {
             window.OpenPngAsTab(WritePng(dir, "sheet.png"));
             Dispatcher.UIThread.RunJobs();
-            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
+            await window.WhenPngTabLoaded();   // drain the off-thread git + decode before cleanup deletes dir
             await window.OpenFileAsTab(WriteAchx(dir, "hero.achx"));
             Dispatcher.UIThread.RunJobs();
 

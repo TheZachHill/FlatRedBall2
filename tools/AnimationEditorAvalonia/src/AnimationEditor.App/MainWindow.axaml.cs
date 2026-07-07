@@ -460,6 +460,14 @@ public partial class MainWindow : Window
         RebuildTabStrip();
     }
 
+    // Latest-wins guard + in-flight handle for the async PNG decode, mirroring the history load.
+    private int _pngTextureLoadId;
+    private Task _pngTextureLoadInFlight = Task.CompletedTask;
+
+    // Lets tests await both background operations a PNG tab kicks off (history load + texture decode)
+    // before deleting the temp dir they read from — otherwise cleanup races the live git/file handles.
+    internal Task WhenPngTabLoaded() => Task.WhenAll(_blameLoadInFlight, _pngTextureLoadInFlight);
+
     /// <summary>Swaps the main pane to the PNG viewer and loads <paramref name="tab"/>'s image.</summary>
     private void ShowPngPane(TabEntry tab)
     {
@@ -467,8 +475,30 @@ public partial class MainWindow : Window
         PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
         SetSidebarForPng(true);
-        PngPane.LoadTexture(tab.Path.FullPath);
+        // Decode the image off the UI thread so the tab appears immediately even for a large sheet;
+        // a "Loading…" overlay shows until it's ready. The history load is likewise async.
+        _pngTextureLoadInFlight = LoadPngTextureAsync(tab.Path.FullPath);
         LoadBlameForPng(tab.Path.FullPath);
+    }
+
+    private async Task LoadPngTextureAsync(string absolutePath)
+    {
+        int id = ++_pngTextureLoadId;
+        PngLoadingText.IsVisible = true;
+        try
+        {
+            await PngPane.LoadTextureAsync(absolutePath);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngTab] texture load failed: {ex}");
+        }
+        finally
+        {
+            // Only the newest load clears the indicator, so a superseded load can't hide it early.
+            if (id == _pngTextureLoadId)
+                PngLoadingText.IsVisible = false;
+        }
     }
 
     /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
@@ -1195,10 +1225,6 @@ public partial class MainWindow : Window
     // The most recent history load, awaited by the next one so the loads run in issue order — that
     // keeps the service's state on the most-recently-requested file even under fast tab switches.
     private Task _blameLoadInFlight = Task.CompletedTask;
-
-    // Lets tests await the fire-and-forget history load (it shells out to git in a temp dir; without
-    // awaiting it, a test's cleanup races the live git process for the directory handle).
-    internal Task PendingBlameLoad => _blameLoadInFlight;
 
     /// <summary>
     /// Starts loading <paramref name="absolutePath"/>'s git history into the revision list. The git
