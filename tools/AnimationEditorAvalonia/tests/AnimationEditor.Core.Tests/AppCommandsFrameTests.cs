@@ -192,6 +192,69 @@ public class AppCommandsFrameTests
         Assert.Equal("real.png", target.Frames[0].TextureName);
     }
 
+    [Fact]
+    public void AddFrame_ChainHasFrames_InheritsLastFrameRegion()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "sheet.png");
+        var prev = chain.Frames[0];
+        prev.LeftCoordinate   = 0.25f;
+        prev.RightCoordinate  = 0.5f;
+        prev.TopCoordinate    = 0.1f;
+        prev.BottomCoordinate = 0.6f;
+
+        ctx.AppCommands.AddFrame(chain); // inherits the previous frame's sub-region, not the whole sheet
+
+        var added = chain.Frames[^1];
+        Assert.Equal(0.25f, added.LeftCoordinate);
+        Assert.Equal(0.5f,  added.RightCoordinate);
+        Assert.Equal(0.1f,  added.TopCoordinate);
+        Assert.Equal(0.6f,  added.BottomCoordinate);
+    }
+
+    [Fact]
+    public void AddFrame_EmptyChain_BorrowsRegionFromOtherChain()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var withTexture = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        ctx.AppCommands.AddFrame(withTexture, "sheet.png");
+        var src = withTexture.Frames[0];
+        src.LeftCoordinate   = 0.5f;
+        src.RightCoordinate  = 0.75f;
+        src.TopCoordinate    = 0f;
+        src.BottomCoordinate = 0.25f;
+        var empty = TestHelpers.MakeChain(ctx.Acls, "Idle");
+
+        ctx.AppCommands.AddFrame(empty); // borrows the source frame's region too, not just its texture
+
+        var added = empty.Frames[0];
+        Assert.Equal(0.5f,  added.LeftCoordinate);
+        Assert.Equal(0.75f, added.RightCoordinate);
+        Assert.Equal(0f,    added.TopCoordinate);
+        Assert.Equal(0.25f, added.BottomCoordinate);
+    }
+
+    [Fact]
+    public void AddFrame_WithExplicitTexture_DefaultsToFullRegion()
+    {
+        // Drag-drop passes an explicit texture; the new frame covers the whole sheet
+        // rather than inheriting a previous frame's sub-region.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "sheet.png");
+        chain.Frames[0].LeftCoordinate  = 0.25f;
+        chain.Frames[0].RightCoordinate = 0.5f;
+
+        ctx.AppCommands.AddFrame(chain, "other.png");
+
+        var added = chain.Frames[^1];
+        Assert.Equal(0f, added.LeftCoordinate);
+        Assert.Equal(1f, added.RightCoordinate);
+        Assert.Equal(0f, added.TopCoordinate);
+        Assert.Equal(1f, added.BottomCoordinate);
+    }
+
     // ── MoveFrame ────────────────────────────────────────────────────────────
 
     [Fact]

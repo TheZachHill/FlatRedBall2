@@ -605,13 +605,21 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
+            // When no texture is passed, inherit both the texture and the sub-region from a
+            // source frame so the new frame lands on the same sheet cell the user is working in,
+            // rather than snapping back to the whole texture. An explicit texture (e.g. drag-drop
+            // of a different image) keeps the default full-texture region.
+            var source = textureName is null
+                ? ResolveInheritedFrame(chain, _pm.AnimationChainListSave)
+                : null;
+
             var frame = new AnimationFrameSave
             {
-                TextureName  = textureName ?? ResolveInheritedTextureName(chain, _pm.AnimationChainListSave),
-                LeftCoordinate   = 0f,
-                RightCoordinate  = 1f,
-                TopCoordinate    = 0f,
-                BottomCoordinate = 1f,
+                TextureName  = textureName ?? source?.TextureName ?? string.Empty,
+                LeftCoordinate   = source?.LeftCoordinate   ?? 0f,
+                RightCoordinate  = source?.RightCoordinate  ?? 1f,
+                TopCoordinate    = source?.TopCoordinate    ?? 0f,
+                BottomCoordinate = source?.BottomCoordinate ?? 1f,
                 FrameLength      = 0.1f,
                 ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
@@ -619,27 +627,28 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <summary>
-        /// Picks the texture a newly added frame should inherit when the caller supplies none.
-        /// Resolution order: (1) the chain's current last frame, so a frame continues the sheet
-        /// the animation already uses; (2) the first frame with a non-empty texture from any chain
-        /// in list order, so a still-empty chain borrows a sensible default; (3) empty string when
-        /// no texture exists anywhere.
+        /// Picks the frame a newly added frame should inherit its texture and sub-region from
+        /// when the caller supplies no texture. Resolution order: (1) the chain's current last
+        /// frame, so a new frame continues on the same sheet cell the animation already uses;
+        /// (2) the first frame with a non-empty texture from any chain in list order, so a
+        /// still-empty chain borrows a sensible default; (3) <c>null</c> when no texture exists
+        /// anywhere, in which case the new frame defaults to the whole texture.
         /// </summary>
-        public static string ResolveInheritedTextureName(
+        public static AnimationFrameSave? ResolveInheritedFrame(
             AnimationChainSave chain, AnimationChainListSave? chainList)
         {
             if (chain.Frames.Count > 0)
-                return chain.Frames[^1].TextureName;
+                return chain.Frames[^1];
 
             if (chainList is not null)
             {
                 foreach (var otherChain in chainList.AnimationChains)
                     foreach (var frame in otherChain.Frames)
                         if (!string.IsNullOrEmpty(frame.TextureName))
-                            return frame.TextureName;
+                            return frame;
             }
 
-            return string.Empty;
+            return null;
         }
 
         public void MoveChain(AnimationChainSave chain, int delta)
