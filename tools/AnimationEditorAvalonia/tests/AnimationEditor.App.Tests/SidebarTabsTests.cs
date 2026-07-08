@@ -65,4 +65,64 @@ public class SidebarTabsTests
         }
         finally { window.Close(); }
     }
+
+    [AvaloniaFact]
+    public void ShortcutsTab_OnLaunch_IsHiddenAndMenuUnchecked()
+    {
+        // #633: the Shortcuts tab is a hidden-by-default toggleable tab, not always visible like
+        // Inspector/History/Files.
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var tab = window.FindControl<TabItem>("ShortcutsTab")!;
+            var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
+            Assert.False(tab.IsVisible);
+            Assert.False(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void MenuShowShortcuts_ClickedOnce_ShowsAndSelectsShortcutsTabAndChecksMenu()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+
+            var tabs = window.FindControl<TabControl>("SidebarTabs")!;
+            var tab = window.FindControl<TabItem>("ShortcutsTab")!;
+            Assert.True(tab.IsVisible);
+            Assert.Same(tab, tabs.SelectedItem);
+            Assert.True(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void MenuShowShortcuts_ClickedTwice_HidesShortcutsTabAndFallsBackToInspector()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+
+            var tabs = window.FindControl<TabControl>("SidebarTabs")!;
+            var tab = window.FindControl<TabItem>("ShortcutsTab")!;
+            var inspector = window.FindControl<TabItem>("InspectorTab")!;
+            Assert.False(tab.IsVisible);
+            Assert.Same(inspector, tabs.SelectedItem);
+            Assert.False(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
 }

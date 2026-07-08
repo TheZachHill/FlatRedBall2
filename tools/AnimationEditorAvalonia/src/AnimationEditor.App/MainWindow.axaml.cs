@@ -1795,6 +1795,7 @@ public partial class MainWindow : Window
         HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
         HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
+        _ = new Helpers.ToggleableSidebarTab(SidebarTabs, ShortcutsTab, InspectorTab, MenuShowShortcuts);
 
         MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
         MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();

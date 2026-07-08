@@ -141,6 +141,8 @@
                         <!-- InputGesture set in code from the hotkey registry — see note above. -->
                         <MenuItem Header="Show _Render Diagnostics" x:Name="MenuShowDiagnostics"
                                   ToggleType="CheckBox" />
+                        <MenuItem Header="_Keyboard Shortcuts" x:Name="MenuShowShortcuts"
+                                  ToggleType="CheckBox" />
                         <MenuItem Header="View _Log"      x:Name="MenuViewLog" />
                         <MenuItem Header="_About"         x:Name="MenuAbout" />
                     </MenuItem>
@@ -1096,6 +1098,15 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                         </Grid>
+                    </TabItem>
+
+                    <!-- Keyboard Shortcuts reference (#633/#634) — hidden until toggled on from the
+                         Help menu via ToggleableSidebarTab. Real content (sourced from the hotkey
+                         registry, #632) lands in #634; this is the toggle mechanism's first consumer. -->
+                    <TabItem x:Name="ShortcutsTab" Header="Shortcuts" IsVisible="False">
+                        <TextBlock Margin="8" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource InkMid}"
+                                   Text="Keyboard shortcuts reference will appear here." />
                     </TabItem>
                 </TabControl>
             </Grid>
