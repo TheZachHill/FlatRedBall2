@@ -1,6 +1,8 @@
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Xunit;
@@ -115,6 +117,68 @@ public class SidebarTabsTests
             var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
             menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
             menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+
+            var tabs = window.FindControl<TabControl>("SidebarTabs")!;
+            var tab = window.FindControl<TabItem>("ShortcutsTab")!;
+            var inspector = window.FindControl<TabItem>("InspectorTab")!;
+            Assert.False(tab.IsVisible);
+            Assert.Same(inspector, tabs.SelectedItem);
+            Assert.False(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ShortcutsTabCloseButton_Clicked_HidesShortcutsTabAndFallsBackToInspector()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+
+            var closeButton = window.FindControl<Button>("ShortcutsTabCloseButton")!;
+            closeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent) { Source = closeButton });
+
+            var tabs = window.FindControl<TabControl>("SidebarTabs")!;
+            var tab = window.FindControl<TabItem>("ShortcutsTab")!;
+            var inspector = window.FindControl<TabItem>("InspectorTab")!;
+            Assert.False(tab.IsVisible);
+            Assert.Same(inspector, tabs.SelectedItem);
+            Assert.False(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    // Raises a middle-button-release directly on the header, rather than simulating a physical
+    // click through the window: the header only exists once ToggleableSidebarTab makes the tab
+    // visible mid-test, and the headless compositor's hit-test scene lags behind that late
+    // layout change, so a coordinate-based click can miss the freshly-shown control. Raising the
+    // routed event directly still exercises the same handler a real middle-click would invoke.
+    private static void RaiseMiddleClick(Control target)
+    {
+        var pointer = new Pointer(0, PointerType.Mouse, isPrimary: true);
+        var properties = new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.MiddleButtonReleased);
+        var args = new PointerReleasedEventArgs(
+            target, pointer, target, new Point(0, 0), 0, properties, KeyModifiers.None, MouseButton.Middle);
+        target.RaiseEvent(args);
+    }
+
+    [AvaloniaFact]
+    public void ShortcutsTabHeader_MiddleClicked_HidesShortcutsTabAndFallsBackToInspector()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var menu = window.FindControl<MenuItem>("MenuShowShortcuts")!;
+            menu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent) { Source = menu });
+
+            var header = window.FindControl<Control>("ShortcutsTabHeader")!;
+            RaiseMiddleClick(header);
 
             var tabs = window.FindControl<TabControl>("SidebarTabs")!;
             var tab = window.FindControl<TabItem>("ShortcutsTab")!;

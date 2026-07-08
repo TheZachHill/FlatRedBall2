@@ -1795,7 +1795,16 @@ public partial class MainWindow : Window
         HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
         HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
-        _ = new Helpers.ToggleableSidebarTab(SidebarTabs, ShortcutsTab, InspectorTab, MenuShowShortcuts);
+        var shortcutsTabToggle = new Helpers.ToggleableSidebarTab(SidebarTabs, ShortcutsTab, InspectorTab, MenuShowShortcuts);
+        ShortcutsTabCloseButton.Click += (_, _) => shortcutsTabToggle.Hide();
+        ShortcutsTabHeader.PointerReleased += (_, args) =>
+        {
+            if (args.GetCurrentPoint(ShortcutsTabHeader).Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonReleased)
+            {
+                shortcutsTabToggle.Hide();
+                args.Handled = true;
+            }
+        };
 
         MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
         MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();

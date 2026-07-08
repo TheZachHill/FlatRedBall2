@@ -39,7 +39,8 @@ internal sealed class ToggleableSidebarTab
         _menuItem.IsChecked = true;
     }
 
-    private void Hide()
+    /// <summary>Hides the tab, e.g. from a close button or middle-click on the tab header.</summary>
+    public void Hide()
     {
         _tab.IsVisible = false;
         if (ReferenceEquals(_tabs.SelectedItem, _tab))

@@ -1103,7 +1103,21 @@
                     <!-- Keyboard Shortcuts reference (#633/#634) — hidden until toggled on from the
                          Help menu via ToggleableSidebarTab. Real content (sourced from the hotkey
                          registry, #632) lands in #634; this is the toggle mechanism's first consumer. -->
-                    <TabItem x:Name="ShortcutsTab" Header="Shortcuts" IsVisible="False">
+                    <TabItem x:Name="ShortcutsTab" IsVisible="False">
+                        <TabItem.Header>
+                            <!-- Close affordances mirror the file-tab-strip's ✕ button + middle-click
+                                 (RebuildTabStrip), so both closeable-tab surfaces behave the same way. -->
+                            <Grid x:Name="ShortcutsTabHeader" ColumnDefinitions="Auto,Auto">
+                                <TextBlock x:Name="ShortcutsTabLabel" Grid.Column="0" Text="Shortcuts" VerticalAlignment="Center" />
+                                <Button x:Name="ShortcutsTabCloseButton" Grid.Column="1"
+                                        Content="✕" FontSize="9" Width="16" Height="16" Padding="0"
+                                        Margin="4,0,0,0"
+                                        Background="Transparent" BorderThickness="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Close" />
+                            </Grid>
+                        </TabItem.Header>
                         <TextBlock Margin="8" FontSize="11" TextWrapping="Wrap"
                                    Foreground="{DynamicResource InkMid}"
                                    Text="Keyboard shortcuts reference will appear here." />
