@@ -51,7 +51,7 @@ This covers `.tmx`, `.tsx`, and `.png` files in the `Content/Tiled/` directory.
 Read `.claude/templates/Tiled/StandardTileset.tsx` for the full list of tile IDs and their Classes. The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. GID 0 means empty (no tile). GID 1 is `SolidCollision` — used in virtually every game as the primary wall/floor/ceiling tile.
 
 Tiles fall into two categories:
-- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`.
+- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`. Hand-drawn rectangle/polygon `<object>`s on an object layer with a matching Class are consumed too (see "Collision from an object layer" below) — useful for a boundary shape that doesn't align to the stamp grid.
 - **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`, `BreakableCollision`) — place on object layers for precise per-entity placement, or paint them on regular tile layers for grid-aligned bulk spawns (e.g., rows of breakable bricks). Either way, `map.CreateEntities()` finds both and by default removes the source tile after spawning so it doesn't double-draw under the entity (opt out with `removeSourceTiles: false`). See the `levels` skill for the API.
 
 ## Layer Conventions
@@ -145,6 +145,10 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 **Current limitations:**
 - `<ellipse>` and polyline collision objects are ignored — only `<polygon>` and plain `<object>` rectangles are honored.
 - Only one `<polygon>` per tile is supported. Authoring a second polygon on the same tile throws `InvalidOperationException` at load time — merge the shapes into a single polygon in Tiled instead. (Rectangles have no such limit.)
+
+### Collision from an object layer
+
+`GenerateCollisionFromClass`/`GenerateCollisionFromProperty` (the all-layers form, i.e. no `layerName` argument) also match `<object>` rectangles and polygons on any object layer whose own Class/property matches — not just tile objects. Each matched shape is positioned relative to whichever grid cell contains its center, same as a tileset tile's sub-cell `<object>`s, so **it must fit within roughly one cell** to be found by broad-phase collision queries; it does not need to be grid-aligned within that cell. Rotated objects (`rotation` attribute) throw `InvalidOperationException` at load time — remove rotation in Tiled. Passing an explicit `layerName` restricts the scan to a single **tile** layer and skips object layers entirely.
 
 ### Add an object layer for entity spawns
 

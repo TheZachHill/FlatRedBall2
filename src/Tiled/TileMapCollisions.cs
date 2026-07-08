@@ -10,6 +10,10 @@ namespace FlatRedBall2.Tiled;
 /// <summary>
 /// Generates a <see cref="TileShapes"/> from a <see cref="TilemapTileLayer"/>
 /// by matching tiles on their <see cref="TilemapTileData.Class"/> attribute or a custom property.
+/// The all-layers overloads (<see cref="GenerateFromClass(Tilemap, string, float, float)"/>,
+/// <see cref="GenerateFromProperty(Tilemap, string, float, float)"/>) also match rectangle and
+/// polygon objects on any <see cref="TilemapObjectLayer"/> — the single-layer overloads are
+/// tile-layer only.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,6 +25,15 @@ namespace FlatRedBall2.Tiled;
 /// <para>
 /// Tile matching uses the tileset metadata from <see cref="Tilemap.Tilesets"/>. Only tiles with a
 /// non-zero global ID that pass the predicate produce collision rectangles.
+/// </para>
+/// <para>
+/// Object matching checks <see cref="TilemapRectangleObject"/> and <see cref="TilemapPolygonObject"/>
+/// entries directly — tile objects (Tiled's "Insert Tile" tool) are not matched; use
+/// <see cref="TileMap.CreateEntities"/> for those. Each matched object is positioned relative to
+/// whichever grid cell contains its center, the same convention used for per-tile
+/// <see cref="TilemapTileData.CollisionObjects"/> — an object must fit within roughly one cell to
+/// be found by broad-phase collision queries. Rotated objects (<c>Rotation != 0</c>) throw
+/// <see cref="InvalidOperationException"/> rather than silently producing wrong geometry.
 /// </para>
 /// </remarks>
 public static class TileMapCollisions
@@ -102,7 +115,8 @@ public static class TileMapCollisions
         float mapY = 0f)
     {
         return GenerateFromAllLayers(tilemap, mapX, mapY,
-            tileData => string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase));
+            tileData => string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase),
+            obj => string.Equals(obj.Class, className, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -128,7 +142,8 @@ public static class TileMapCollisions
         float mapY = 0f)
     {
         return GenerateFromAllLayers(tilemap, mapX, mapY,
-            tileData => tileData.Properties.TryGetValue(propertyName, out _));
+            tileData => tileData.Properties.TryGetValue(propertyName, out _),
+            obj => obj.Properties.TryGetValue(propertyName, out _));
     }
 
     /// <summary>
@@ -147,16 +162,31 @@ public static class TileMapCollisions
 
     /// <summary>
     /// All-layers variant of <see cref="RegenerateInto(Tilemap, TilemapTileLayer, Func{TilemapTileData, bool}, TileShapes)"/>.
+    /// Also re-scans object layers using <paramref name="objectPredicate"/>.
     /// </summary>
     internal static void RegenerateInto(
         Tilemap tilemap,
         Func<TilemapTileData, bool> predicate,
+        Func<TilemapObject, bool> objectPredicate,
         TileShapes target)
     {
+        // target.X/Y were set from mapX/mapY by the original Generate call; mapY (the map's top
+        // edge) is recovered from target.Y (the bottom edge) since object conversion needs the
+        // top-edge convention. See GenerateFromAllLayers.
+        float mapX = target.X;
+        float mapY = target.Y + tilemap.Height * tilemap.TileHeight;
+
         foreach (var layer in tilemap.Layers)
         {
-            if (layer is TilemapTileLayer tileLayer)
-                AddMatchingTiles(tilemap, tileLayer, predicate, target);
+            switch (layer)
+            {
+                case TilemapTileLayer tileLayer:
+                    AddMatchingTiles(tilemap, tileLayer, predicate, target);
+                    break;
+                case TilemapObjectLayer objectLayer:
+                    AddMatchingObjects(objectLayer, mapX, mapY, objectPredicate, target);
+                    break;
+            }
         }
     }
 
@@ -189,27 +219,118 @@ public static class TileMapCollisions
         Tilemap tilemap,
         float mapX,
         float mapY,
-        Func<TilemapTileData, bool> predicate)
+        Func<TilemapTileData, bool> tilePredicate,
+        Func<TilemapObject, bool> objectPredicate)
     {
-        // Use the first tile layer's dimensions for the collection grid.
-        // All tile layers in a Tiled map share the same tile dimensions.
         var collection = new TileShapes
         {
             X = mapX,
+            // Map-level height, not a per-layer height — must be set before any object layer is
+            // processed (object layers may appear before tile layers in Tiled's layer order).
+            Y = mapY - tilemap.Height * tilemap.TileHeight,
             GridSize = tilemap.TileWidth
         };
 
         foreach (var layer in tilemap.Layers)
         {
-            if (layer is not TilemapTileLayer tileLayer)
-                continue;
-
-            // Set Y based on this layer's height (should be consistent across layers).
-            collection.Y = mapY - tileLayer.Height * tilemap.TileHeight;
-            AddMatchingTiles(tilemap, tileLayer, predicate, collection);
+            switch (layer)
+            {
+                case TilemapTileLayer tileLayer:
+                    AddMatchingTiles(tilemap, tileLayer, tilePredicate, collection);
+                    break;
+                case TilemapObjectLayer objectLayer:
+                    AddMatchingObjects(objectLayer, mapX, mapY, objectPredicate, collection);
+                    break;
+            }
         }
 
         return collection;
+    }
+
+    /// <summary>
+    /// Scans rectangle and polygon objects on <paramref name="layer"/> and adds a collision shape
+    /// for each whose <see cref="TilemapObject.Class"/> or properties satisfy
+    /// <paramref name="predicate"/>. Each shape is positioned relative to whichever grid cell
+    /// contains its center — the same convention used for per-tile <see cref="TilemapTileData.CollisionObjects"/>.
+    /// Tile objects (placed with Tiled's "Insert Tile" tool) are not matched here — use
+    /// <see cref="TileMap.CreateEntities"/> for those.
+    /// </summary>
+    private static void AddMatchingObjects(
+        TilemapObjectLayer layer,
+        float mapX,
+        float mapY,
+        Func<TilemapObject, bool> predicate,
+        TileShapes collection)
+    {
+        foreach (var obj in layer.Objects)
+        {
+            if (!predicate(obj)) continue;
+
+            switch (obj)
+            {
+                case TilemapRectangleObject rectObj:
+                    AddRectangleObject(rectObj, mapX, mapY, collection);
+                    break;
+                case TilemapPolygonObject polyObj:
+                    AddPolygonObject(polyObj, mapX, mapY, collection);
+                    break;
+            }
+        }
+    }
+
+    private static void AddRectangleObject(TilemapRectangleObject rectObj, float mapX, float mapY, TileShapes collection)
+    {
+        ThrowIfRotated(rectObj);
+
+        float w = rectObj.Size.X;
+        float h = rectObj.Size.Y;
+        // Tiled rect: top-left (Position.X, Position.Y), Y-down from map top-left.
+        float worldCenterX = mapX + rectObj.Position.X + w / 2f;
+        float worldCenterY = mapY - (rectObj.Position.Y + h / 2f);
+
+        var (col, row) = collection.GetCellAt(new Vector2(worldCenterX, worldCenterY));
+        var cellCenter = collection.GetCellWorldPosition(col, row);
+
+        collection.AddRectangleTileAtCell(col, row,
+            worldCenterX - cellCenter.X, worldCenterY - cellCenter.Y, w, h);
+    }
+
+    private static void AddPolygonObject(TilemapPolygonObject polyObj, float mapX, float mapY, TileShapes collection)
+    {
+        if (polyObj.Points == null || polyObj.Points.Length < 3) return;
+        ThrowIfRotated(polyObj);
+
+        var worldPoints = new List<Vector2>(polyObj.Points.Length);
+        float sumX = 0f, sumY = 0f;
+        foreach (var p in polyObj.Points)
+        {
+            XnaVec2 tiled = polyObj.Position + p;
+            float wx = mapX + tiled.X;
+            float wy = mapY - tiled.Y;
+            worldPoints.Add(new Vector2(wx, wy));
+            sumX += wx;
+            sumY += wy;
+        }
+
+        // Owning cell is the polygon's average-point centroid — there's no single "position"
+        // corner to key off, unlike a rectangle's top-left.
+        var centroid = new Vector2(sumX / worldPoints.Count, sumY / worldPoints.Count);
+        var (col, row) = collection.GetCellAt(centroid);
+        var cellCenter = collection.GetCellWorldPosition(col, row);
+
+        var localPoints = new List<Vector2>(worldPoints.Count);
+        foreach (var p in worldPoints)
+            localPoints.Add(p - cellCenter);
+
+        collection.AddPolygonTileAtCell(col, row, Polygon.FromPoints(localPoints));
+    }
+
+    private static void ThrowIfRotated(TilemapObject obj)
+    {
+        if (obj.Rotation != 0f)
+            throw new InvalidOperationException(
+                $"Tiled object '{obj.Name}' (Class '{obj.Class}') has Rotation={obj.Rotation}, " +
+                "which is not supported for collision generation. Remove rotation in Tiled.");
     }
 
     private static void AddMatchingTiles(

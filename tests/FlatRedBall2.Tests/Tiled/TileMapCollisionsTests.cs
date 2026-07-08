@@ -425,6 +425,153 @@ public class TileMapCollisionsTests
             SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
+    // ── Object-layer objects ─────────────────────────────────────────────────
+    // Tiled <object> elements on an object layer (rectangle/polygon tools, not tile stamps)
+    // whose Class matches are converted into collision shapes the same way per-tile
+    // CollisionObjects are: positioned relative to whichever grid cell contains their center.
+
+    private static Tilemap BuildObjectOnlyTilemap(
+        int widthTiles, int heightTiles, int tileSize, TilemapObjectLayer objectLayer)
+    {
+        var tilemap = new Tilemap(
+            name: "test", width: widthTiles, height: heightTiles,
+            tileWidth: tileSize, tileHeight: tileSize,
+            orientation: TilemapOrientation.Orthogonal);
+        tilemap.Layers.Add(objectLayer);
+        return tilemap;
+    }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerRectMatchingClass_EmitsRectAtOwningCell()
+    {
+        // 2x2 map, tile size 16. Rect at Tiled (0,0,16,16) — exactly cell (col 0, tmx row 0).
+        // Tsc row = H-1-tmxRow = 2-1-0 = 1.
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16)) { Class = "Solid" });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        var rects = coll.GetRectangleTilesAtCell(0, 1);
+        rects.Count.ShouldBe(1);
+        rects[0].X.ShouldBe(8f);
+        rects[0].Y.ShouldBe(-8f);
+        rects[0].Width.ShouldBe(16f);
+        rects[0].Height.ShouldBe(16f);
+    }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerRectNonMatchingClass_NotEmitted()
+    {
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16)) { Class = "Other" });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        coll.GetRectangleTilesAtCell(0, 1).Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerPolygonMatchingClass_EmitsPolygonAtOwningCell()
+    {
+        // Same triangle shape as the per-tile polygon test, but authored at Tiled position
+        // (16, 0) on an object layer — expect the same local-point pattern since both paths
+        // convert to Y-up, centered-on-owning-cell.
+        var tri = new XnaVec2[] { new(0, 0), new(16, 16), new(0, 16) };
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapPolygonObject(
+            id: 1, position: new XnaVec2(16, 0), points: tri) { Class = "Solid" });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        var poly = coll.GetPolygonTileAtCell(1, 1);
+        poly.ShouldNotBeNull();
+        poly!.Points.Count.ShouldBe(3);
+        poly.Points[0].ShouldBe(new Vector2(-8f, 8f));
+        poly.Points[1].ShouldBe(new Vector2(8f, -8f));
+        poly.Points[2].ShouldBe(new Vector2(-8f, -8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerRotatedRect_Throws()
+    {
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16))
+        { Class = "Solid", Rotation = 45f });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        Should.Throw<System.InvalidOperationException>(
+            () => TileMapCollisions.GenerateFromClass(tilemap, "Solid"));
+    }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerRotatedPolygon_Throws()
+    {
+        var tri = new XnaVec2[] { new(0, 0), new(16, 16), new(0, 16) };
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapPolygonObject(
+            id: 1, position: new XnaVec2(0, 0), points: tri)
+        { Class = "Solid", Rotation = 30f });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        Should.Throw<System.InvalidOperationException>(
+            () => TileMapCollisions.GenerateFromClass(tilemap, "Solid"));
+    }
+
+    [Fact]
+    public void GenerateFromProperty_ObjectLayerRectWithMatchingProperty_Emitted()
+    {
+        var rectObj = new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16));
+        rectObj.Properties.SetBool("Hazard", true);
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(rectObj);
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromProperty(tilemap, "Hazard");
+
+        coll.GetRectangleTilesAtCell(0, 1).Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void GenerateFromClass_MixedTileLayerAndObjectLayer_BothEmitted()
+    {
+        // Object layer is added to tilemap.Layers BEFORE the tile layer, to guard against
+        // collection.Y being computed from per-tile-layer height rather than tilemap.Height —
+        // if computed lazily inside the tile-layer branch, an object encountered first would
+        // resolve against Y=0 and land in the wrong cell.
+        var objectLayer = new TilemapObjectLayer("Objects");
+        objectLayer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(16, 16), size: new XnaVec2(16, 16)) { Class = "Solid" });
+
+        var tilemap = new Tilemap(
+            name: "test", width: 2, height: 2, tileWidth: 16, tileHeight: 16,
+            orientation: TilemapOrientation.Orthogonal);
+        tilemap.Layers.Add(objectLayer);
+
+        var tileset = new TilemapTileset(
+            name: "ts", texture: null!, tileWidth: 16, tileHeight: 16, tileCount: 1, columns: 1);
+        tileset.FirstGlobalId = 1;
+        tileset.AddTileData(new TilemapTileData(0) { Class = "Solid" });
+        tilemap.Tilesets.Add(tileset);
+
+        var tileLayer = new TilemapTileLayer("Main", 2, 2, 16, 16);
+        tileLayer.SetTile(0, 0, new TilemapTile(globalId: 1));
+        tilemap.Layers.Add(tileLayer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        // Tile at tmx (0,0) -> tsc (0, 1).
+        coll.GetTileAtCell(0, 1).ShouldNotBeNull();
+        // Object rect at Tiled (16,16,16,16) -> tmx cell (col 1, row 1) -> tsc row 0.
+        coll.GetRectangleTilesAtCell(1, 0).Count.ShouldBe(1);
+    }
+
     [Fact]
     public void GenerateFromClass_SubCellRectAdjacentToPolygonTile_SuppressesRectFaceAtShared()
     {
