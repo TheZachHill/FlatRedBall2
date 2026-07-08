@@ -5311,9 +5311,15 @@ public partial class MainWindow : Window
             .GroupBy(h => h.Category)
             .Select(g => new Models.HotkeyCategoryVm(
                 g.Key,
-                g.Select(h => new Models.HotkeyEntryVm(h.Description, h.DisplayText)).ToList()))
+                g.Select(h => new Models.HotkeyEntryVm(h.Description, FormatGestureForDisplay(h))).ToList()))
             .ToList();
     }
+
+    // HotkeyDefinition.DisplayText must keep Avalonia's Key enum names verbatim (e.g. "OemPlus")
+    // since SetMenuGesture feeds it to KeyGesture.Parse, which only recognizes real Key names.
+    // This panel has no such constraint, so swap in words a user would actually recognize.
+    private static string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
+        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus");
 
     private void WireKeyboard()
     {

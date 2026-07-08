@@ -208,6 +208,13 @@ public class SidebarTabsTests
             var undo = categories.SelectMany(c => c.Hotkeys).First(h => h.Description == "Undo");
             Assert.Equal("Ctrl+Z", undo.Gesture);
 
+            // #632's registry names these keys "OemPlus"/"OemMinus" (Avalonia's Key enum, needed
+            // so MenuItem.InputGesture stays parseable) — the panel spells them out instead.
+            var zoomIn = categories.SelectMany(c => c.Hotkeys).First(h => h.Description == "Zoom In (Focused Panel)");
+            Assert.Equal("Ctrl+Plus", zoomIn.Gesture);
+            var zoomOut = categories.SelectMany(c => c.Hotkeys).First(h => h.Description == "Zoom Out (Focused Panel)");
+            Assert.Equal("Ctrl+Minus", zoomOut.Gesture);
+
             int totalRows = categories.Sum(c => c.Hotkeys.Count);
             Assert.Equal(window.Hotkeys.Count, totalRows);
         }
