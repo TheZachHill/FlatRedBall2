@@ -5303,10 +5303,23 @@ public partial class MainWindow : Window
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
         item.InputGesture = KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
 
+    // Sourced from the same registry the KeyDown dispatch and menu gesture text use (#632), so
+    // this list can never drift from what a keypress actually does (#634).
+    private void RefreshShortcutsPanel()
+    {
+        ShortcutsList.ItemsSource = _hotkeys
+            .GroupBy(h => h.Category)
+            .Select(g => new Models.HotkeyCategoryVm(
+                g.Key,
+                g.Select(h => new Models.HotkeyEntryVm(h.Description, h.DisplayText)).ToList()))
+            .ToList();
+    }
+
     private void WireKeyboard()
     {
         _hotkeys = BuildHotkeyDefinitions();
         ApplyHotkeyMenuGestureText();
+        RefreshShortcutsPanel();
 
         // Use Tunnel routing so we intercept keys before child controls (e.g. the TreeView,
         // which handles Up/Down for navigation and would mark the event Handled before the

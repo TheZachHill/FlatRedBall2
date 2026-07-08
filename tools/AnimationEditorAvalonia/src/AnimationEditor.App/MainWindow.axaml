@@ -1101,8 +1101,9 @@
                     </TabItem>
 
                     <!-- Keyboard Shortcuts reference (#633/#634) — hidden until toggled on from the
-                         Help menu via ToggleableSidebarTab. Real content (sourced from the hotkey
-                         registry, #632) lands in #634; this is the toggle mechanism's first consumer. -->
+                         Help menu via ToggleableSidebarTab. Content is sourced from the hotkey
+                         registry (#632, RefreshShortcutsPanel) so it can't drift from what a
+                         keypress actually does. -->
                     <TabItem x:Name="ShortcutsTab" IsVisible="False">
                         <TabItem.Header>
                             <!-- Close affordances mirror the file-tab-strip's ✕ button + middle-click
@@ -1118,9 +1119,32 @@
                                         ToolTip.Tip="Close" />
                             </Grid>
                         </TabItem.Header>
-                        <TextBlock Margin="8" FontSize="11" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource InkMid}"
-                                   Text="Keyboard shortcuts reference will appear here." />
+                        <ScrollViewer Background="{DynamicResource BgPanel}">
+                            <ItemsControl x:Name="ShortcutsList" Margin="8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="appModels:HotkeyCategoryVm">
+                                        <StackPanel Margin="0,0,0,10">
+                                            <TextBlock Text="{Binding Category}" FontSize="11" FontWeight="Bold"
+                                                       Foreground="{DynamicResource Ink}" Margin="0,0,0,4" />
+                                            <ItemsControl ItemsSource="{Binding Hotkeys}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="appModels:HotkeyEntryVm">
+                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Description}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource InkMid}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Gesture}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource Ink}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </Grid>

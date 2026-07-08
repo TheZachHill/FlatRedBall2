@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using AnimationEditor.App.Models;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -186,6 +188,28 @@ public class SidebarTabsTests
             Assert.False(tab.IsVisible);
             Assert.Same(inspector, tabs.SelectedItem);
             Assert.False(menu.IsChecked);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ShortcutsList_OnLaunch_IsPopulatedFromTheHotkeyRegistry()
+    {
+        // #634: content is sourced from the same registry the KeyDown dispatch uses (#632), so
+        // it can never drift from what a keypress actually does.
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var list = window.FindControl<ItemsControl>("ShortcutsList")!;
+            var categories = ((IEnumerable<HotkeyCategoryVm>)list.ItemsSource!).ToList();
+
+            var undo = categories.SelectMany(c => c.Hotkeys).First(h => h.Description == "Undo");
+            Assert.Equal("Ctrl+Z", undo.Gesture);
+
+            int totalRows = categories.Sum(c => c.Hotkeys.Count);
+            Assert.Equal(window.Hotkeys.Count, totalRows);
         }
         finally { window.Close(); }
     }
