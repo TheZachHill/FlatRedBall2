@@ -17,6 +17,8 @@ Headless PNG capture of the Animation Editor's UI, for illustrating documentatio
 
 `ScreenshotCapture.Capture(visual, outputPath)` — pass a `Window`/dialog (`TopLevel`) for full chrome, or any `Control` (e.g. `window.FindControl<Control>("AnimTree")`) to crop to just that control's bounds. Built on `TopLevel.CaptureRenderedFrame()`, not a hand-rolled `RenderTargetBitmap.Render(visual)` — the latter silently writes an empty PNG under headless (see the decision doc).
 
+**Default to capturing the whole `window`, not a cropped control.** A screenshot showing only one panel strips the viewer's frame of reference for where that panel sits in the app. Crop to a specific control only when the user explicitly asks to see just that panel.
+
 ## Driving a scenario shares `animation-editor-testing`'s gotchas
 
 Building chain/frame/selection state to screenshot uses the same `TestServices`/`CreateMainWindow` pattern as correctness tests — read `animation-editor-testing`'s "Service wiring in tests" section first, especially: assign `ProjectManager.AnimationChainListSave` (and add chains/frames) *after* `window.Show()` + `Dispatcher.UIThread.RunJobs()`, never before. `MainWindow.OnOpened` replaces it with a blank instance otherwise, silently discarding anything set up earlier.
