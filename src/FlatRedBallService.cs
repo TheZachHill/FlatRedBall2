@@ -545,6 +545,14 @@ public class FlatRedBallService
         _gum.PopupRoot?.Children.Clear();
         _gum.ModalRoot?.Children.Clear();
 
+        // Unify this screen's OverlayRoot with Gum's own Root so element.AddToRoot() and
+        // screen.AddOverlay() target the same container — and AddToRoot content actually draws (the
+        // OverlayRoot is registered as a drawn overlay blob after CustomInitialize below). Per-screen:
+        // each screen's OverlayRoot becomes the Root for its lifetime, reassigned on every transition
+        // (safe per Gum's reassignable Root, vchelaru/Gum#3584). The Clear above ran against the
+        // outgoing screen's root; from here on Root is the incoming screen's.
+        _gum.Root = (InteractiveGue)screen.OverlayRoot;
+
         // Apply the screen's preferred display settings. Camera properties always apply;
         // window properties (size, resizing) only apply on Start to avoid mid-game window pops.
         var pref = screen.PreferredDisplaySettings;
@@ -585,6 +593,11 @@ public class FlatRedBallService
 
         if (_game != null)
         {
+            // Register the unified OverlayRoot (== _gum.Root) as one drawn overlay blob so everything
+            // added via AddOverlay OR element.AddToRoot() renders (AddToRoot content previously
+            // received input but never drew). Registered first so it draws under the popups below.
+            screen.AddOverlayRoot(screen.OverlayRoot);
+
             // Register each camera's per-camera popup/modal roots so popups routed to them (via
             // GraphicalUiElement.ResolvePopupRoots) draw in that camera's pass, on top of the HUD
             // CustomInitialize just added.
@@ -1047,12 +1060,11 @@ public class FlatRedBallService
             // Width/Height each frame; Gum gates internally on equality and triggers its own
             // UpdateLayout when dims change).
             _gumUpdateList.Clear();
-            _gumUpdateList.Add(_gum.Root);
-            // EntityVisualsRoot sits between _gum.Root and the per-camera UiRoots so that
-            // entity-attached visuals have lower cursor priority than HUD elements (which
-            // live on Camera.UiRoot) and far lower than modal overlays (OverlayRoot, last).
-            // This matches the visual stacking: world-projected entity Gum draws beneath HUD,
-            // so its input dispatch should also lose to HUD on overlap.
+            // EntityVisualsRoot has the lowest cursor priority (first): entity-attached visuals lose
+            // to HUD elements (per-camera UiRoots) and to the overlay (OverlayRoot, last) on overlap,
+            // matching the visual stacking. OverlayRoot is now the unified GumService.Root, so
+            // AddToRoot()/AddOverlay() content is covered by the single OverlayRoot add at the end —
+            // no separate _gum.Root entry (it would be a duplicate).
             _gumUpdateList.Add(CurrentScreen.EntityVisualsRoot);
             for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
             {

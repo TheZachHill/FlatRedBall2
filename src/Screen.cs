@@ -249,7 +249,7 @@ public class Screen : ILifecycleEvents
     /// Adds a Gum visual element to this screen's primary camera HUD. Equivalent to
     /// <c>Cameras[0].Add(visual, layer)</c>. For split-screen, call <see cref="Camera.Add(GraphicalUiElement, Layer?)"/>
     /// directly on the desired camera; for full-window UI shared across all cameras, use
-    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.
+    /// <see cref="AddOverlay(GraphicalUiElement)"/>.
     /// </summary>
     public void Add(GraphicalUiElement visual, Layer? layer = null)
         => Cameras[0].Add(visual, layer ?? Layer);
@@ -271,7 +271,7 @@ public class Screen : ILifecycleEvents
     // so no explicit UpdateLayout call or external gating is needed here.
     /// <summary>
     /// Lazily-created Gum root for the screen-level overlay. Visuals added via
-    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/> are parented here and laid out
+    /// <see cref="AddOverlay(GraphicalUiElement)"/> are parented here and laid out
     /// against the full back-buffer dimensions, drawn in a single pass after the per-camera loop.
     /// Use this for pause menus, title cards, and other UI that should not be split per viewport.
     /// </summary>
@@ -284,32 +284,23 @@ public class Screen : ILifecycleEvents
     /// camera's draw pass. Use for pause menus, dialog boxes, and other UI that must span
     /// the entire window in split-screen.
     /// </summary>
-    public void AddOverlay(GraphicalUiElement visual, Layer? layer = null)
-    {
-        OverlayRoot.Children.Add(visual);
-        var renderable = new GumRenderable(visual) { Layer = layer ?? Layer, IsOverlay = true };
-        _gumRenderables.Add(renderable);
-        _gumByVisual[visual] = renderable;
-        _renderList.Add(renderable);
-    }
+    public void AddOverlay(GraphicalUiElement visual)
+        => OverlayRoot.Children.Add(visual);
 
-    /// <summary>Adds a Gum Forms control to the screen-level overlay layer. See <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.</summary>
-    public void AddOverlay(FrameworkElement element, Layer? layer = null)
-        => AddOverlay(element.Visual, layer);
+    /// <summary>Adds a Gum Forms control to the screen-level overlay. See <see cref="AddOverlay(GraphicalUiElement)"/>.</summary>
+    public void AddOverlay(FrameworkElement element)
+        => AddOverlay(element.Visual);
 
-    /// <summary>Removes a visual previously added with <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.</summary>
+    /// <summary>Removes a visual previously added with <see cref="AddOverlay(GraphicalUiElement)"/>.</summary>
     public void RemoveOverlay(GraphicalUiElement visual)
-    {
-        OverlayRoot.Children.Remove(visual);
-        RemoveGumVisualInternal(visual);
-    }
+        => OverlayRoot.Children.Remove(visual);
 
-    /// <summary>Removes a Forms control previously added with <see cref="AddOverlay(FrameworkElement, Layer?)"/>.</summary>
+    /// <summary>Removes a Forms control previously added with <see cref="AddOverlay(FrameworkElement)"/>.</summary>
     public void RemoveOverlay(FrameworkElement element) => RemoveOverlay(element.Visual);
 
     /// <summary>
     /// Registers an existing Gum root as a screen-level overlay without reparenting it. Unlike
-    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/> (which parents a leaf visual under
+    /// <see cref="AddOverlay(GraphicalUiElement)"/> (which parents a leaf visual under
     /// <see cref="OverlayRoot"/>), <paramref name="root"/> is drawn as-is — used for Gum Forms'
     /// global <c>PopupRoot</c>/<c>ModalRoot</c>, which must stay unparented for Gum's own Forms
     /// code to treat them as top-level roots.
