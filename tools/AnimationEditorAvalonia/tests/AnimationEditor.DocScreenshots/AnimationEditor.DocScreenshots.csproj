@@ -26,4 +26,12 @@
     <ProjectReference Include="..\..\src\AnimationEditor.App\AnimationEditor.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Bundle the real character sprite sheet next to the test exe so scenarios can load a genuine
+         texture (see the animation-editor-screenshots skill) without a source-relative path. -->
+    <None Include="..\..\manual-test-content\characters\characters.png"
+          Link="fixtures\characters.png"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
