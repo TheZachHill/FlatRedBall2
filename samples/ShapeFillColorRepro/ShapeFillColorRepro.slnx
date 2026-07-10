@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="../../src/FlatRedBall2.csproj" />
-  <Project Path="../../src/Animation.Content/FlatRedBall2.Animation.Content.csproj" />
-  <Project Path="ShapeFillColorRepro.csproj" />
-</Solution>

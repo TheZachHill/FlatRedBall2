@@ -38,7 +38,6 @@ public class ShapesBatch : IRenderBatch
     public static readonly ShapesBatch Instance = new();
 
     private ShapeBatch? _shapeBatch;
-    private bool _warmedUp;
 
     // Called by FlatRedBallService.Initialize so the shader effect is loaded
     // before any shape Draw() call can occur.
@@ -87,32 +86,7 @@ public class ShapesBatch : IRenderBatch
     // before submitting to Apos.Shapes, so no view matrix is needed here.
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
-    {
-        WarmUpOnce();
-        _shapeBatch!.Begin();
-    }
-
-    // #663 bandaid: on macOS DesktopGL the FIRST filled Apos.Shapes draw of a session renders with
-    // the blue channel forced to 1.0 (a black shape comes out blue); shapes drawn after it are fine.
-    // We absorb that cursed first draw here with one throwaway off-screen fill, so the first VISIBLE
-    // shape is never the affected one. The engine's per-frame SpriteBatch background draw already puts
-    // a resident white texture on sampler unit 0 yet does NOT cure it — the trigger is Apos's own first
-    // draw call, not the bound texture — so this warm-up goes through Apos itself.
-    // FRB2_DISABLE_FILL_PRIME=1 skips the warm-up to reproduce the bug for before/after testing.
-    // DO NOT REMOVE without re-verifying the first filled shape's color on macOS DesktopGL (arm64):
-    // the bug is invisible on Windows/Linux and to every headless/CI test. samples/ShapeFillColorRepro
-    // reproduces it.
-    private void WarmUpOnce()
-    {
-        if (_warmedUp) return;
-        _warmedUp = true;
-        if (Environment.GetEnvironmentVariable("FRB2_DISABLE_FILL_PRIME") == "1") return;
-        _shapeBatch!.Begin();
-        _shapeBatch.FillRectangle(new Microsoft.Xna.Framework.Vector2(-100f, -100f),
-                                  new Microsoft.Xna.Framework.Vector2(1f, 1f),
-                                  Microsoft.Xna.Framework.Color.White, aaSize: 0f);
-        _shapeBatch.End();
-    }
+        => _shapeBatch!.Begin();
 
     /// <inheritdoc/>
     public void End(SpriteBatch spriteBatch)
