@@ -38,38 +38,14 @@ public class ShapesBatch : IRenderBatch
     public static readonly ShapesBatch Instance = new();
 
     private ShapeBatch? _shapeBatch;
-    private GraphicsDevice? _graphicsDevice;
-
-    // #663: a loaded 1×1 white texture kept bound to sampler unit 0 for every shapes batch.
-    private Texture2D? _fillUnitTexture;
-    private bool _bindFillUnitTexture;
+    private bool _warmedUp;
 
     // Called by FlatRedBallService.Initialize so the shader effect is loaded
     // before any shape Draw() call can occur.
     internal void Initialize(GraphicsDevice graphicsDevice, ContentManager content)
     {
         ValidateAposShapesVersion();
-        _graphicsDevice = graphicsDevice;
         _shapeBatch = new ShapeBatch(graphicsDevice, content);
-
-        // ── #663: prime sampler unit 0 so filled shapes get the right color on macOS ──────────
-        // Apos.Shapes binds GraphicsDevice.Textures[0] only when an image/font is drawn; a pure
-        // filled shape (FillRectangle) never binds it. Its apos-shapes shader still declares
-        // `sampler TextureSampler : register(s0)`, so the FIRST filled shape of a session draws
-        // with unit 0 unbound. On macOS DesktopGL the driver then substitutes a "zero texture"
-        // ("unit 0 GLD_TEXTURE_INDEX_2D is unloadable ... using zero texture") and the fill renders
-        // the wrong color (e.g. blue instead of black). It self-heals once any textured/font draw
-        // leaves a valid texture on unit 0, which is why only the first shape is affected. We keep
-        // this white pixel bound at the start of every shapes batch (see Begin) so the declared
-        // sampler always resolves.
-        //
-        // DO NOT REMOVE without re-verifying the first filled shape's color on macOS DesktopGL
-        // (arm64): the bug is invisible on Windows/Linux and to every headless/CI test, so nothing
-        // else guards it. samples/ShapeFillColorRepro reproduces it; FRB2_DISABLE_FILL_PRIME=1
-        // disables this prime to reproduce the bug for before/after comparison.
-        _bindFillUnitTexture = Environment.GetEnvironmentVariable("FRB2_DISABLE_FILL_PRIME") != "1";
-        _fillUnitTexture = new Texture2D(graphicsDevice, 1, 1);
-        _fillUnitTexture.SetData(new[] { Microsoft.Xna.Framework.Color.White });
     }
 
     [Conditional("DEBUG")]
@@ -112,10 +88,30 @@ public class ShapesBatch : IRenderBatch
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
+        WarmUpOnce();
         _shapeBatch!.Begin();
-        // #663: ensure sampler unit 0 has a loaded texture before any filled shape flushes. See Initialize.
-        if (_bindFillUnitTexture)
-            _graphicsDevice!.Textures[0] = _fillUnitTexture;
+    }
+
+    // #663 bandaid: on macOS DesktopGL the FIRST filled Apos.Shapes draw of a session renders with
+    // the blue channel forced to 1.0 (a black shape comes out blue); shapes drawn after it are fine.
+    // We absorb that cursed first draw here with one throwaway off-screen fill, so the first VISIBLE
+    // shape is never the affected one. The engine's per-frame SpriteBatch background draw already puts
+    // a resident white texture on sampler unit 0 yet does NOT cure it — the trigger is Apos's own first
+    // draw call, not the bound texture — so this warm-up goes through Apos itself.
+    // FRB2_DISABLE_FILL_PRIME=1 skips the warm-up to reproduce the bug for before/after testing.
+    // DO NOT REMOVE without re-verifying the first filled shape's color on macOS DesktopGL (arm64):
+    // the bug is invisible on Windows/Linux and to every headless/CI test. samples/ShapeFillColorRepro
+    // reproduces it.
+    private void WarmUpOnce()
+    {
+        if (_warmedUp) return;
+        _warmedUp = true;
+        if (Environment.GetEnvironmentVariable("FRB2_DISABLE_FILL_PRIME") == "1") return;
+        _shapeBatch!.Begin();
+        _shapeBatch.FillRectangle(new Microsoft.Xna.Framework.Vector2(-100f, -100f),
+                                  new Microsoft.Xna.Framework.Vector2(1f, 1f),
+                                  Microsoft.Xna.Framework.Color.White, aaSize: 0f);
+        _shapeBatch.End();
     }
 
     /// <inheritdoc/>
