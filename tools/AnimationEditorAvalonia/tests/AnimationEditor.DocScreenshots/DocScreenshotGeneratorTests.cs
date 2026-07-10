@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using AnimationEditor.App;
+using AnimationEditor.App.Controls;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -28,7 +29,11 @@ internal sealed record ScreenshotScenario(
     string Name,
     Action<MainWindow, TestServices> Arrange,
     string? TargetControlName,
-    string OutputFileName);
+    string OutputFileName,
+    // True for scenarios that back a real doc page and get committed under docs/images/ by the
+    // opt-in regenerator. Left false for proof-of-harness scenarios (fake texture names, hand-built
+    // state) that only exist to verify the capture pipeline and must never land in the docs site.
+    bool IncludeInDocs = false);
 
 internal static class DocScreenshotManifest
 {
@@ -80,7 +85,64 @@ internal static class DocScreenshotManifest
             },
             TargetControlName: "InspectorTabContent",
             OutputFileName: "inspector-frame-selected.png"),
+
+        // ── Doc-page scenarios (committed under docs/images/) ─────────────────────────────
+        //
+        // "Your First Animation" hero shot: a knight walk cycle built from the real character
+        // sheet, chain + first frame selected, captured as the full window so the tutorial reader
+        // sees the finished result across all four panels (tree, wireframe, preview, inspector).
+        new ScreenshotScenario(
+            Name: "your-first-animation",
+            Arrange: ArrangeFirstAnimation,
+            TargetControlName: null,
+            OutputFileName: "your-first-animation.png",
+            IncludeInDocs: true),
     };
+
+    /// <summary>Number of consecutive cells taken from the sheet row to form the walk cycle.</summary>
+    private const int WalkFrameCount = 4;
+
+    /// <summary>Row 1 (y=32) of characters.png is the knight walk cycle.</summary>
+    private const int KnightRow = 1;
+
+    private static void ArrangeFirstAnimation(MainWindow window, TestServices ctx)
+    {
+        ScenarioFixtures.UseCharacterSheetProject(ctx);
+
+        // Build the chain the way the app does — through AppCommands — so every frame carries real
+        // defaults (FrameLength = 0.1s, a ShapesSave), not the bare type defaults a hand-built
+        // AnimationFrameSave would leave behind. AddFrame with an explicit texture starts a frame on
+        // the whole sheet; we then crop each to its walk-cycle cell.
+        var walk = ctx.AppCommands.AddAnimationChainWithName("Walk")!;
+        for (int col = 0; col < WalkFrameCount; col++)
+        {
+            ctx.AppCommands.AddFrame(walk, "characters.png");
+            SetCell(walk.Frames[^1], col, KnightRow);
+        }
+
+        // Select the chain (and its first frame) so the tree highlights it, the wireframe shows the
+        // first cell, and the preview settles on frame 0.
+        ctx.SelectedState.SelectedChain = walk;
+        ctx.SelectedState.SelectedFrame = walk.Frames[0];
+        Dispatcher.UIThread.RunJobs();
+
+        // Zoom the wireframe to just the walk-cycle cells rather than the whole 736×128 sheet.
+        window.FindControl<WireframeControl>("WireframeCtrl")?.FitChainToView(walk);
+
+        // The preview renders a 32px sprite; at the default 100% it's a speck in a large canvas.
+        // Zoom in so the walking knight reads clearly in the hero shot.
+        window.FindControl<PreviewControl>("PreviewCtrl")?.SetZoomPercent(400);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>Crops <paramref name="frame"/> to the (col, row) cell of the 32×32 grid sheet.</summary>
+    private static void SetCell(AnimationFrameSave frame, int col, int row)
+    {
+        frame.LeftCoordinate   = col * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetWidth;
+        frame.RightCoordinate  = (col + 1) * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetWidth;
+        frame.TopCoordinate    = row * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetHeight;
+        frame.BottomCoordinate = (row + 1) * ScenarioFixtures.CellSize / (float)ScenarioFixtures.SheetHeight;
+    }
 }
 
 /// <summary>
@@ -171,6 +233,47 @@ public class DocScreenshotGeneratorTests
         {
             if (Directory.Exists(outputDir))
                 Directory.Delete(outputDir, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Opt-in regeneration of the committed documentation PNGs under <c>docs/images/</c> — #636's
+    /// "rerun the script" entry point. Skipped unless <c>FRB_WRITE_DOC_SCREENSHOTS=1</c> so a normal
+    /// <c>dotnet test</c> (including CI) never rewrites tracked files: headless AA/font rendering
+    /// isn't byte-identical across platforms, so only a human deliberately regenerating on one
+    /// machine should touch them. To refresh the images: set the env var, run this test, review and
+    /// commit the changed PNGs.
+    /// </summary>
+    [AvaloniaFact]
+    public void RegenerateCommittedDocScreenshots()
+    {
+        if (Environment.GetEnvironmentVariable("FRB_WRITE_DOC_SCREENSHOTS") != "1")
+            return;
+
+        var imagesDir = Path.Combine(
+            RepoLayout.FindDocsRoot(AppContext.BaseDirectory)
+                ?? throw new InvalidOperationException(
+                    $"Could not locate a docs/ folder above {AppContext.BaseDirectory}."),
+            "images");
+
+        foreach (var scenario in DocScreenshotManifest.Scenarios)
+        {
+            if (!scenario.IncludeInDocs) continue;
+
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                scenario.Arrange(window, ctx);
+
+                Control target = scenario.TargetControlName is null
+                    ? window
+                    : window.FindControl<Control>(scenario.TargetControlName)
+                        ?? throw new InvalidOperationException(
+                            $"Scenario '{scenario.Name}': control '{scenario.TargetControlName}' not found.");
+
+                ScreenshotCapture.Capture(target, Path.Combine(imagesDir, scenario.OutputFileName));
+            }
+            finally { window.Close(); }
         }
     }
 }

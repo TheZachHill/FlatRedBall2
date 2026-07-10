@@ -1,3 +1,4 @@
 # Table of contents
 
-* [Test Page](README.md)
+* [Animation Editor](README.md)
+* [Your First Animation](your-first-animation.md)
