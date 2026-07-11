@@ -83,3 +83,4 @@ private async Task TweenTo(float tx, float ty, TimeSpan duration)
 - **Always snap on spawn** — entities loaded from a TMX object layer may have sub-pixel offsets. Round `X` and `Y` to the nearest tile in `CustomInitialize`.
 - **`_moving` guard is required** — without it, holding a key queues multiple moves before the first frame completes.
 - **Diagonal movement**: If 8-way is needed, check that both axis tiles are clear before committing. Diagonal into a corner with one axis blocked should push to the open axis or reject.
+- **Entity origin and draw order**: if entities need screen-depth sorting (walking behind/in front of scenery), `(X,Y)` should be the ground-contact point and `Z = -Y` each frame — see `top-down-movement`'s Entity Origin and Draw Order section.
