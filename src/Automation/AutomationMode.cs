@@ -1,4 +1,3 @@
-#if DEBUG
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -325,7 +324,7 @@ internal class AutomationMode
             return false;
         }
         var inst = factory.EntityInstances[0];
-#pragma warning disable IL2075 // Intentional reflection; DEBUG-only, never runs in AOT deployments.
+#pragma warning disable IL2075 // Intentional reflection; only reachable via EnableAutomationMode, which is compiled out of Release consumer builds and never runs in AOT deployments.
         var p = inst.GetType().GetProperty(propName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 #pragma warning restore IL2075
@@ -432,7 +431,7 @@ internal class AutomationMode
     {
         var dict = new Dictionary<string, object?>();
         var t = entity.GetType();
-#pragma warning disable IL2075 // Intentional reflection; DEBUG-only, never runs in AOT deployments.
+#pragma warning disable IL2075 // Intentional reflection; only reachable via EnableAutomationMode, which is compiled out of Release consumer builds and never runs in AOT deployments.
         foreach (var prop in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
 #pragma warning restore IL2075
         {
@@ -477,7 +476,7 @@ internal class AutomationMode
 
     private void WriteResponse(object response)
     {
-#pragma warning disable IL2026, IL3050 // Intentional dynamic JSON; DEBUG-only, never runs in AOT deployments.
+#pragma warning disable IL2026, IL3050 // Intentional dynamic JSON; only reachable via EnableAutomationMode, which is compiled out of Release consumer builds and never runs in AOT deployments.
         var json = JsonSerializer.Serialize(response);
 #pragma warning restore IL2026, IL3050
         lock (_output)
@@ -487,4 +486,3 @@ internal class AutomationMode
         }
     }
 }
-#endif

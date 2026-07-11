@@ -952,12 +952,17 @@ public class FlatRedBallService
     /// <summary>The active screen's overlay. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Overlay"/>.</summary>
     public Overlay Overlay => CurrentScreen.Overlay;
 
-#if DEBUG
     private Automation.AutomationMode? _automationMode;
 
     /// <summary>
     /// Activates automation mode when the game is launched with --frb-auto. No-op otherwise.
-    /// Call in Game.Initialize after base.Initialize(). In Release builds this is a no-op.
+    /// Call in Game.Initialize after base.Initialize().
+    /// <para>
+    /// This call site is compiled out entirely in Release builds of <b>your</b> project (via
+    /// <see cref="System.Diagnostics.ConditionalAttribute"/> on "DEBUG") — it is safe to leave
+    /// unconditionally in shipping code. Gating is based on your project's own Debug/Release
+    /// configuration, not FlatRedBall2's.
+    /// </para>
     /// <para>
     /// When automation activates, <see cref="Random"/> is replaced with a deterministic
     /// <see cref="GameRandom"/> so recorded NDJSON runs reproduce exactly.
@@ -969,6 +974,7 @@ public class FlatRedBallService
     /// keeps its default time-based seed. When --frb-auto is present, omitting this
     /// parameter (or passing <c>null</c>) seeds <see cref="Random"/> with <c>0</c>.
     /// </param>
+    [System.Diagnostics.Conditional("DEBUG")]
     public void EnableAutomationMode(int? seed = null)
     {
         if (System.Environment.GetCommandLineArgs().Contains("--frb-auto"))
@@ -999,11 +1005,6 @@ public class FlatRedBallService
     /// </summary>
     public void RegisterValueSetter(string entityName, string propName, Action<double> setter)
         => _automationMode?.RegisterValueSetter(entityName, propName, setter);
-#else
-    public void EnableAutomationMode(int? seed = null) { }
-    public void RegisterStateProvider(string name, Func<object> provider) { }
-    public void RegisterValueSetter(string entityName, string propName, Action<double> setter) { }
-#endif
 
     /// <summary>
     /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
@@ -1013,7 +1014,6 @@ public class FlatRedBallService
     public void Update(GameTime gameTime)
     {
         long updateStart = System.Diagnostics.Stopwatch.GetTimestamp();
-#if DEBUG
         if (_automationMode != null)
         {
             if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
@@ -1022,7 +1022,6 @@ public class FlatRedBallService
                 return;
             }
         }
-#endif
 
         // Apply pending screen transition at start of frame
         if (_pendingScreenChange != null)
@@ -1197,10 +1196,8 @@ public class FlatRedBallService
             CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, _overlayCamera);
         }
 
-#if DEBUG
         _automationMode?.FlushStepResponse(Time.CurrentFrame);
         _automationMode?.FulfillPendingScreenshot(gd, Time.CurrentFrame);
-#endif
 
         _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
         _frameProfile.RenderMs = _frameProfile.DrawTotalMs;
