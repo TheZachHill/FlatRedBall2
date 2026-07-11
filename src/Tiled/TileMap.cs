@@ -239,24 +239,26 @@ public class TileMap
     /// (decreasing world Y). No bounds check — callers may pass coordinates outside the map.
     /// </summary>
     /// <remarks>
-    /// For orthogonal maps this is the tile's center — useful for procedurally spawning entities
-    /// at specific tile coordinates without duplicating the
-    /// <c>X + col * TileWidth + TileWidth / 2</c> arithmetic. For isometric/staggered/hexagonal
-    /// maps this delegates to MonoGame.Extended's <see cref="Tilemap.TileToWorldPosition"/>,
-    /// which returns each orientation's own tile anchor (e.g. the top vertex of an isometric
-    /// diamond) rather than a geometric bounding-box center.
+    /// Returns the tile's center — useful for procedurally spawning entities at specific tile
+    /// coordinates. <see cref="Tilemap.TileToWorldPosition"/> (used for every orientation once a
+    /// TMX is loaded) returns the top-left corner of the tile's <see cref="TileWidth"/> ×
+    /// <see cref="TileHeight"/> bounding box — the same anchor MonoGame.Extended's renderer
+    /// draws each tile's quad from, for orthogonal <b>and</b> isometric/staggered/hexagonal maps
+    /// alike — so this method adds the half-tile offset to reach the center in every case.
     /// </remarks>
     public Vector2 GetCellWorldPosition(int col, int row)
     {
-        if (Orientation == TilemapOrientation.Orthogonal)
+        if (_tilemap == null)
         {
             return new Vector2(
                 _x + col * _tileWidth + _tileWidth / 2f,
                 _y - row * _tileHeight - _tileHeight / 2f);
         }
 
-        var mg = _tilemap!.TileToWorldPosition(col, row);
-        return new Vector2(_x + mg.X, _y - mg.Y);
+        var mg = _tilemap.TileToWorldPosition(col, row);
+        return new Vector2(
+            _x + mg.X + _tileWidth / 2f,
+            _y - mg.Y - _tileHeight / 2f);
     }
 
     /// <summary>
@@ -269,7 +271,12 @@ public class TileMap
     /// For orthogonal maps this floors toward negative infinity, so points left of or above the
     /// map origin yield negative indices rather than truncating toward zero. For
     /// isometric/staggered/hexagonal maps this delegates to MonoGame.Extended's
-    /// <see cref="Tilemap.WorldToTilePosition"/>, which truncates toward zero instead.
+    /// <see cref="Tilemap.WorldToTilePosition"/> (after undoing the half-tile centering applied
+    /// by <see cref="GetCellWorldPosition"/>), which truncates toward zero instead — and, for
+    /// isometric maps with an odd <see cref="TileWidth"/> or <see cref="TileHeight"/>, halves
+    /// tile dimensions with float division where <see cref="Tilemap.TileToWorldPosition"/> used
+    /// integer division, an inconsistency in MonoGame.Extended 6.0.0 that can round-trip a cell
+    /// to a neighboring one. Even tile dimensions are unaffected.
     /// </remarks>
     public (int col, int row) GetCellAt(Vector2 worldPoint)
     {
@@ -280,7 +287,9 @@ public class TileMap
                 (int)MathF.Floor((_y - worldPoint.Y) / _tileHeight));
         }
 
-        var local = new XnaVector2(worldPoint.X - _x, _y - worldPoint.Y);
+        var local = new XnaVector2(
+            worldPoint.X - _x - _tileWidth / 2f,
+            _y - worldPoint.Y - _tileHeight / 2f);
         var tile = _tilemap!.WorldToTilePosition(local);
         return (tile.X, tile.Y);
     }
@@ -804,6 +813,13 @@ public class TileMap
 
     private static bool IsStructurallyCompatible(Tilemap oldMap, Tilemap newMap)
     {
+        // A reload that changes orientation must force a full restart rather than an in-place
+        // reload: RegenerateInto has no NotSupportedException guard (only the public
+        // TileMapCollisions.GenerateFrom* entry points do), so silently reloading an
+        // orthogonal-tracked TileShapes against newly-isometric tile data would regenerate
+        // silently-wrong axis-aligned rectangles instead of failing loudly.
+        if (oldMap.Orientation != newMap.Orientation) return false;
+
         if (oldMap.Width != newMap.Width) return false;
         if (oldMap.Height != newMap.Height) return false;
         if (oldMap.TileWidth != newMap.TileWidth) return false;
