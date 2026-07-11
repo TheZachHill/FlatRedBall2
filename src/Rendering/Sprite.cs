@@ -221,6 +221,16 @@ public class Sprite : IRenderable, IAttachable
     /// </summary>
     public bool FlipVertical { get; set; }
 
+    /// <summary>
+    /// Mirrors the texture across its diagonal (transposes width/height) when <c>true</c>.
+    /// Combines with <see cref="FlipHorizontal"/>/<see cref="FlipVertical"/> in the same D→H→V
+    /// order Tiled and the Animation Editor use. MonoGame's <c>SpriteEffects</c> has no diagonal
+    /// value, so this is implemented as a rotation offset rather than a texture-sampling flag —
+    /// see <see cref="ComputeDrawTransform"/>. Overwritten by the current animation frame while
+    /// <see cref="Animate"/> is on.
+    /// </summary>
+    public bool FlipDiagonal { get; set; }
+
     // Animation
 
     /// <summary>
@@ -398,6 +408,7 @@ public class Sprite : IRenderable, IAttachable
         _sourceRectangle = frame.SourceRectangle;
         FlipHorizontal = frame.FlipHorizontal;
         FlipVertical = frame.FlipVertical;
+        FlipDiagonal = frame.FlipDiagonal;
         X = frame.RelativeX;
         Y = frame.RelativeY;
         RecalculateDimensions();
@@ -575,18 +586,47 @@ public class Sprite : IRenderable, IAttachable
     // spin clockwise (opposite a polygon hitbox on the same entity).
     internal float RenderRotationRadians => AbsoluteRotation.Radians;
 
+    // Rotation + SpriteEffects handed to SpriteBatch.Draw, folding in FlipDiagonal.
+    //
+    // MonoGame's SpriteEffects has no diagonal/transpose value, and SpriteBatch offers no way to
+    // swap which UV axis a corner samples — effects only mirror an axis in place; rotation only
+    // moves the already-UV-mapped quad. A diagonal flip is a reflection (determinant -1), while
+    // rotation alone is not (determinant +1), so no rotation/effects combination reproduces it —
+    // EXCEPT that composing a rotation with a single-axis mirror IS a reflection, and any 2D
+    // reflection can be written that way. Concretely: a +/-90 degree rotation offset plus (at
+    // most) SpriteEffects.FlipVertically reproduces the exact diagonal-transpose matrix
+    // (0, b, c, 0) that AnimationEditorAvalonia's FlipScaleCalculator.ComputeMatrix uses for the
+    // SkiaSharp preview (issue #593 requires editor/runtime parity). Width/Height, origin, and
+    // scale are untouched — the 90 degree rotation is what swaps the on-screen footprint, not a
+    // manual axis swap. See SpriteDiagonalFlipTests for the derivation check against that matrix.
+    //
+    // Non-diagonal case unchanged: FlipVertically is the base effect that cancels the camera's
+    // Y-flip (Batch.FlipsY); user-facing FlipVertical XORs it (net upside-down relative to
+    // upright); FlipHorizontal is purely additive and unaffected by the Y-flip.
+    internal (float rotation, SpriteEffects effects) ComputeDrawTransform()
+    {
+        bool effectiveFlipVertical = (Batch?.FlipsY ?? true) ^ FlipVertical;
+
+        if (FlipDiagonal)
+        {
+            float rotation = RenderRotationRadians + (effectiveFlipVertical ? MathHelper.PiOver2 : -MathHelper.PiOver2);
+            var effects = (FlipHorizontal == effectiveFlipVertical) ? SpriteEffects.FlipVertically : SpriteEffects.None;
+            return (rotation, effects);
+        }
+        else
+        {
+            var effects = effectiveFlipVertical ? SpriteEffects.FlipVertically : SpriteEffects.None;
+            if (FlipHorizontal) effects |= SpriteEffects.FlipHorizontally;
+            return (RenderRotationRadians, effects);
+        }
+    }
+
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!IsVisible || Texture == null) return;
 
-        // When the batch's transform flips Y (world Y+ up → screen Y+ down), sprite texture pixels
-        // would appear upside-down without compensation. FlipVertically is the base effect that
-        // cancels the camera flip. User-facing FlipVertical XORs this, producing a net upside-down
-        // appearance relative to normal. FlipHorizontal is purely additive and unaffected by the Y-flip.
-        var effects = (Batch?.FlipsY ?? true) ? SpriteEffects.FlipVertically : SpriteEffects.None;
-        if (FlipHorizontal) effects |= SpriteEffects.FlipHorizontally;
-        if (FlipVertical)   effects ^= SpriteEffects.FlipVertically;
+        var (rotation, effects) = ComputeDrawTransform();
 
         // Origin and scale must be relative to the source region, not the full texture.
         float srcW = SourceRectangle?.Width  ?? Texture.Width;
@@ -602,7 +642,7 @@ public class Sprite : IRenderable, IAttachable
             position,
             SourceRectangle,
             color,
-            RenderRotationRadians,
+            rotation,
             origin,
             scale,
             effects,

@@ -117,6 +117,22 @@ public class SpriteAnimationTests
     }
 
     [Fact]
+    public void PlayAnimation_FrameWithFlipDiagonal_SetsSpriteFlipDiagonal()
+    {
+        var chain = new AnimationChain { Name = "Roll" };
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), FlipDiagonal = true });
+
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Roll");
+
+        sprite.FlipDiagonal.ShouldBeTrue();
+    }
+
+    [Fact]
     public void AnimateSelf_FrameChange_UpdatesXY()
     {
         var chain = new AnimationChain { Name = "Walk" };
