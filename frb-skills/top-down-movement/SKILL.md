@@ -144,6 +144,12 @@ _sprite.PlayAnimation(chain);
 
 `ToCardinal()` defaults to `DiagonalCollapse.Horizontal` (UpRight/DownRight → Right, UpLeft/DownLeft → Left) because horizontal silhouettes usually read more distinctly. Pass `DiagonalCollapse.Vertical` when up/down poses are more distinct than left/right.
 
+## Entity Origin and Draw Order
+
+An entity's `(X,Y)` should be its ground-contact point (e.g. between a character's feet), not the sprite's visual center — `Sprite` always draws centered on its entity (see `entities-and-factories`), so offset `Sprite.X`/`Sprite.Y` upward once texture size is known.
+
+This also drives screen-depth draw order. The engine sorts by `Layer` then `Z` (see `engine-overview`) — there's no built-in Y-sort. To make lower-on-screen entities draw on top (e.g. walking in front of/behind a tree), set `Z = -Y` each frame. This only reads correctly if `Y` is the ground-contact point, not a floating visual center.
+
 ## Collision Setup
 
 Use `MoveFirstOnCollision` for standard top-down (no bounce needed):
