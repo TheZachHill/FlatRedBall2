@@ -354,9 +354,9 @@ public class TileMap
     /// for painted tiles.
     /// </para>
     /// <para>
-    /// If the entity declares a public settable <c>int TiledGid</c> property, it is populated
-    /// with the spawning tile's Tiled global ID (GID). This is opt-in — entities that don't
-    /// declare the property are unaffected.
+    /// If the entity declares a public settable <c>TiledGid</c> property of type <c>int</c>,
+    /// <c>uint</c>, <c>long</c>, or <c>ulong</c>, it is populated with the spawning tile's Tiled
+    /// global ID (GID). This is opt-in — entities that don't declare the property are unaffected.
     /// </para>
     /// <para>
     /// If the factory has <see cref="Factory{T}.IsSolidGrid"/> set, the whole scan is wrapped
@@ -579,11 +579,19 @@ public class TileMap
         foreach (var (name, propInfo) in entityProps)
         {
             // TiledGid is a synthetic entry, not a real Tiled property — opt-in purely by
-            // declaring a public settable `int TiledGid` property on the entity.
-            if (propInfo.PropertyType == typeof(int) &&
-                string.Equals(name, "TiledGid", StringComparison.OrdinalIgnoreCase))
+            // declaring a public settable TiledGid property on the entity. GID is always a
+            // non-negative Int32, so int/uint/long/ulong are all safe widening conversions.
+            // short/ushort/byte are deliberately not supported — they can silently truncate.
+            if (string.Equals(name, "TiledGid", StringComparison.OrdinalIgnoreCase))
             {
-                propInfo.SetValue(entity, gid);
+                if (propInfo.PropertyType == typeof(int))
+                    propInfo.SetValue(entity, gid);
+                else if (propInfo.PropertyType == typeof(uint))
+                    propInfo.SetValue(entity, (uint)gid);
+                else if (propInfo.PropertyType == typeof(long))
+                    propInfo.SetValue(entity, (long)gid);
+                else if (propInfo.PropertyType == typeof(ulong))
+                    propInfo.SetValue(entity, (ulong)gid);
                 continue;
             }
 

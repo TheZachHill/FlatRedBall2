@@ -512,4 +512,64 @@ public class TileMapCreateEntitiesTests
         factory[0].Worth.ShouldBe(50);
         factory[0].TiledGid.ShouldBe(1); // FirstGlobalId (1) + localId (0)
     }
+
+    private class UIntGidEntity : Entity
+    {
+        public uint TiledGid { get; set; }
+    }
+
+    private class LongGidEntity : Entity
+    {
+        public long TiledGid { get; set; }
+    }
+
+    private class ULongGidEntity : Entity
+    {
+        public ulong TiledGid { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesUIntProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<UIntGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1u); // FirstGlobalId (1) + localId (0)
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesLongProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<LongGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1L); // FirstGlobalId (1) + localId (0)
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesULongProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<ULongGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1ul); // FirstGlobalId (1) + localId (0)
+    }
 }
