@@ -11,6 +11,7 @@ using MonoGame.Extended.Tilemaps.Rendering;
 using MonoGame.Extended.Tilemaps.Tiled;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
+using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Tiled;
 
@@ -208,11 +209,23 @@ public class TileMap
         }
     }
 
-    /// <summary>Map width in world units (tile columns × tile width).</summary>
-    public float Width => _width;
+    /// <summary>
+    /// Map width in world units. For orthogonal maps this is tile columns × tile width; for
+    /// isometric/staggered/hexagonal maps it comes from MonoGame.Extended's
+    /// <see cref="Tilemap.WorldBounds"/>, which accounts for the diamond/staggered footprint.
+    /// </summary>
+    public float Width => _tilemap?.WorldBounds.Width ?? _width;
 
-    /// <summary>Map height in world units (tile rows × tile height).</summary>
-    public float Height => _height;
+    /// <summary>Map height in world units. See <see cref="Width"/> for orientation handling.</summary>
+    public float Height => _tilemap?.WorldBounds.Height ?? _height;
+
+    /// <summary>
+    /// The map's Tiled orientation (Orthogonal, Isometric, Staggered, or Hexagonal). Determines
+    /// how <see cref="GetCellWorldPosition"/> and <see cref="GetCellAt"/> convert between tile
+    /// and world coordinates. Maps constructed without a loaded TMX (test-only constructors)
+    /// report <see cref="TilemapOrientation.Orthogonal"/>.
+    /// </summary>
+    public TilemapOrientation Orientation => _tilemap?.Orientation ?? TilemapOrientation.Orthogonal;
 
     /// <summary>Width of a single tile in world units.</summary>
     public int TileWidth => _tileWidth;
@@ -221,27 +234,56 @@ public class TileMap
     public int TileHeight => _tileHeight;
 
     /// <summary>
-    /// Returns the world-space center of the tile at (<paramref name="col"/>, <paramref name="row"/>),
+    /// Returns the world-space position of the tile at (<paramref name="col"/>, <paramref name="row"/>),
     /// using Tiled's row convention — row 0 is the top row, increasing row moves downward
     /// (decreasing world Y). No bounds check — callers may pass coordinates outside the map.
-    /// Useful for procedurally spawning entities at specific tile coordinates without
-    /// duplicating the <c>X + col * TileWidth + TileWidth / 2</c> arithmetic.
     /// </summary>
-    public Vector2 GetCellWorldPosition(int col, int row) => new(
-        _x + col * _tileWidth + _tileWidth / 2f,
-        _y - row * _tileHeight - _tileHeight / 2f);
+    /// <remarks>
+    /// For orthogonal maps this is the tile's center — useful for procedurally spawning entities
+    /// at specific tile coordinates without duplicating the
+    /// <c>X + col * TileWidth + TileWidth / 2</c> arithmetic. For isometric/staggered/hexagonal
+    /// maps this delegates to MonoGame.Extended's <see cref="Tilemap.TileToWorldPosition"/>,
+    /// which returns each orientation's own tile anchor (e.g. the top vertex of an isometric
+    /// diamond) rather than a geometric bounding-box center.
+    /// </remarks>
+    public Vector2 GetCellWorldPosition(int col, int row)
+    {
+        if (Orientation == TilemapOrientation.Orthogonal)
+        {
+            return new Vector2(
+                _x + col * _tileWidth + _tileWidth / 2f,
+                _y - row * _tileHeight - _tileHeight / 2f);
+        }
+
+        var mg = _tilemap!.TileToWorldPosition(col, row);
+        return new Vector2(_x + mg.X, _y - mg.Y);
+    }
 
     /// <summary>
     /// Returns the (col, row) of the tile containing <paramref name="worldPoint"/> —
     /// the inverse of <see cref="GetCellWorldPosition"/>. Uses Tiled's row convention
     /// (row 0 is the top row; increasing row moves downward / decreasing world Y).
-    /// Floors toward negative infinity, so points left of or above the map origin yield
-    /// negative indices rather than truncating toward zero. No bounds check — callers may
-    /// receive indices outside the map.
+    /// No bounds check — callers may receive indices outside the map.
     /// </summary>
-    public (int col, int row) GetCellAt(Vector2 worldPoint) => (
-        (int)MathF.Floor((worldPoint.X - _x) / _tileWidth),
-        (int)MathF.Floor((_y - worldPoint.Y) / _tileHeight));
+    /// <remarks>
+    /// For orthogonal maps this floors toward negative infinity, so points left of or above the
+    /// map origin yield negative indices rather than truncating toward zero. For
+    /// isometric/staggered/hexagonal maps this delegates to MonoGame.Extended's
+    /// <see cref="Tilemap.WorldToTilePosition"/>, which truncates toward zero instead.
+    /// </remarks>
+    public (int col, int row) GetCellAt(Vector2 worldPoint)
+    {
+        if (Orientation == TilemapOrientation.Orthogonal)
+        {
+            return (
+                (int)MathF.Floor((worldPoint.X - _x) / _tileWidth),
+                (int)MathF.Floor((_y - worldPoint.Y) / _tileHeight));
+        }
+
+        var local = new XnaVector2(worldPoint.X - _x, _y - worldPoint.Y);
+        var tile = _tilemap!.WorldToTilePosition(local);
+        return (tile.X, tile.Y);
+    }
 
     /// <summary>
     /// Returns a <see cref="BoundsRectangle"/> suitable for
@@ -282,6 +324,12 @@ public class TileMap
     /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
     /// object layers.
     /// </param>
+    /// <exception cref="NotSupportedException">
+    /// <see cref="Orientation"/> is not <see cref="TilemapOrientation.Orthogonal"/> — the
+    /// underlying <see cref="TileShapes"/> broad-phase grid has no diamond/staggered cell
+    /// representation. Use <see cref="GetCellAt"/> for point-in-tile queries instead, or place
+    /// collision objects on an object layer in Tiled.
+    /// </exception>
     public TileShapes GenerateCollisionFromClass(string className, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
@@ -312,6 +360,12 @@ public class TileMap
     /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
     /// object layers.
     /// </param>
+    /// <exception cref="NotSupportedException">
+    /// <see cref="Orientation"/> is not <see cref="TilemapOrientation.Orthogonal"/> — the
+    /// underlying <see cref="TileShapes"/> broad-phase grid has no diamond/staggered cell
+    /// representation. Use <see cref="GetCellAt"/> for point-in-tile queries instead, or place
+    /// collision objects on an object layer in Tiled.
+    /// </exception>
     public TileShapes GenerateCollisionFromProperty(string propertyName, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
@@ -514,13 +568,8 @@ public class TileMap
                     !string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                // Tile (col, row) in Tiled pixel coords has its bottom-left at
-                // (col*tw, (row+1)*th) measured from the map's top-left, Y-down.
-                // Convert to world space (Y-up) using _x/_y = top-left.
-                float bottomLeftX = _x + col * tw;
-                float bottomLeftY = _y - (row + 1) * th;
-
-                var (worldX, worldY) = OriginOffset(bottomLeftX, bottomLeftY, tw, th, origin);
+                var center = GetCellWorldPosition(col, row);
+                var (worldX, worldY) = OriginOffsetFromCenter(center.X, center.Y, tw, th, origin);
 
                 // Painted cells have no per-instance property bag (Tiled doesn't support them),
                 // so only the tile's class-level properties are in play here.
@@ -611,18 +660,18 @@ public class TileMap
         }
     }
 
-    private static (float x, float y) OriginOffset(float blX, float blY, float w, float h, Origin origin)
+    private static (float x, float y) OriginOffsetFromCenter(float cx, float cy, float w, float h, Origin origin)
     {
         return origin switch
         {
-            Origin.Center => (blX + w / 2f, blY + h / 2f),
-            Origin.BottomCenter => (blX + w / 2f, blY),
-            Origin.TopCenter => (blX + w / 2f, blY + h),
-            Origin.BottomLeft => (blX, blY),
-            Origin.TopLeft => (blX, blY + h),
-            Origin.BottomRight => (blX + w, blY),
-            Origin.TopRight => (blX + w, blY + h),
-            _ => (blX + w / 2f, blY + h / 2f),
+            Origin.Center => (cx, cy),
+            Origin.BottomCenter => (cx, cy - h / 2f),
+            Origin.TopCenter => (cx, cy + h / 2f),
+            Origin.BottomLeft => (cx - w / 2f, cy - h / 2f),
+            Origin.TopLeft => (cx - w / 2f, cy + h / 2f),
+            Origin.BottomRight => (cx + w / 2f, cy - h / 2f),
+            Origin.TopRight => (cx + w / 2f, cy + h / 2f),
+            _ => (cx, cy),
         };
     }
 
