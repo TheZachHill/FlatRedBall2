@@ -375,4 +375,201 @@ public class TileMapCreateEntitiesTests
 
         secondCreated.Count.ShouldBe(1);
     }
+
+    // ============================================================================================
+    // Class-level (tileset type) properties, instance-level overrides, and TiledGid
+    // ============================================================================================
+
+    private class PropertyEntity : Entity
+    {
+        public int Worth { get; set; }
+        public int TiledGid { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_ClassLevelPropertyApplies()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData }, new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(50);
+    }
+
+    [Fact]
+    public void CreateEntities_ObjectLayer_ClassLevelPropertyAppliesWithNoInstanceOverride()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData },
+            placements: System.Array.Empty<(int, int, int)>());
+        tilemap.Layers.Add(BuildObjectLayer("Entities", new[]
+        {
+            (id: 1, localId: 0, x: 16f, y: 48f, size: 16),
+        }));
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(50);
+    }
+
+    [Fact]
+    public void CreateEntities_ObjectLayer_InstancePropertyOverridesClassLevelProperty()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData },
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var tileObj = new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16, 16));
+        tileObj.Properties.SetInt("Worth", 99);
+        objLayer.AddObject(tileObj);
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(99);
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidMatchesSpawningTileGid()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1); // FirstGlobalId (1) + localId (0)
+    }
+
+    [Fact]
+    public void CreateEntities_ObjectLayer_TiledGidMatchesSpawningTileGid()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(1) { Class = "Coin" } },
+            placements: System.Array.Empty<(int, int, int)>());
+        tilemap.Layers.Add(BuildObjectLayer("Entities", new[]
+        {
+            (id: 1, localId: 1, x: 16f, y: 48f, size: 16),
+        }));
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(2); // FirstGlobalId (1) + localId (1)
+    }
+
+    [Fact]
+    public void CreateEntities_EntityWithoutTiledGidProperty_SpawnsWithoutException()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory(); // MarkerEntity declares no TiledGid property
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_ClassLevelPropertyAndTiledGidAppliedAtSpawnTime()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData }, new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        tileMap.CreateEntities("Coin", factory);
+        tileMap.LazySpawner.Update(-100f, 100f, -100f, 100f);
+
+        factory.Count.ShouldBe(1);
+        factory[0].Worth.ShouldBe(50);
+        factory[0].TiledGid.ShouldBe(1); // FirstGlobalId (1) + localId (0)
+    }
+
+    private class UIntGidEntity : Entity
+    {
+        public uint TiledGid { get; set; }
+    }
+
+    private class LongGidEntity : Entity
+    {
+        public long TiledGid { get; set; }
+    }
+
+    private class ULongGidEntity : Entity
+    {
+        public ulong TiledGid { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesUIntProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<UIntGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1u); // FirstGlobalId (1) + localId (0)
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesLongProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<LongGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1L); // FirstGlobalId (1) + localId (0)
+    }
+
+    [Fact]
+    public void CreateEntities_PaintedCell_TiledGidPopulatesULongProperty()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<ULongGidEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].TiledGid.ShouldBe(1ul); // FirstGlobalId (1) + localId (0)
+    }
 }
