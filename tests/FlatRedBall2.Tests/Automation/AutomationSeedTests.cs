@@ -1,4 +1,3 @@
-#if DEBUG
 using System.IO;
 using FlatRedBall2.Utilities;
 using Shouldly;
@@ -62,4 +61,3 @@ public class AutomationSeedTests
         anyDifferent.ShouldBeTrue();
     }
 }
-#endif

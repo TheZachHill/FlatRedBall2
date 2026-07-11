@@ -7,7 +7,7 @@ description: Automation mode in FlatRedBall2. Use when an external agent (AI or 
 
 Automation mode lets an external process control a running game via NDJSON (newline-delimited JSON) over stdin/stdout — one command per line in, one response per line out. The primary use case is AI agents that need to observe and interact with the game the way Playwright interacts with a browser.
 
-**Debug builds only.** `EnableAutomationMode()` is a no-op in Release. This is intentional — automation mode exposes internal state and allows arbitrary value forcing.
+**Debug builds only — gated on your own project's configuration.** `EnableAutomationMode()` is a `[Conditional("DEBUG")]` call: the C# compiler strips the call site entirely when your project builds Release, regardless of how the FlatRedBall2 package itself was built. It's safe to leave the call in unconditionally. This is intentional — automation mode exposes internal state and allows arbitrary value forcing.
 
 ## Setup
 
