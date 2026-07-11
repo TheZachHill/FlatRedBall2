@@ -67,6 +67,7 @@ public static class TileMapCollisions
         float mapX = 0f,
         float mapY = 0f)
     {
+        RequireOrthogonal(tilemap);
         return Generate(tilemap, layer, mapX, mapY,
             tileData => string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase));
     }
@@ -94,6 +95,7 @@ public static class TileMapCollisions
         float mapX = 0f,
         float mapY = 0f)
     {
+        RequireOrthogonal(tilemap);
         return Generate(tilemap, layer, mapX, mapY,
             tileData => tileData.Properties.TryGetValue(propertyName, out _));
     }
@@ -119,6 +121,7 @@ public static class TileMapCollisions
         float mapX = 0f,
         float mapY = 0f)
     {
+        RequireOrthogonal(tilemap);
         return GenerateFromAllLayers(tilemap, mapX, mapY,
             tileData => string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase),
             obj => string.Equals(obj.Class, className, StringComparison.OrdinalIgnoreCase));
@@ -146,9 +149,24 @@ public static class TileMapCollisions
         float mapX = 0f,
         float mapY = 0f)
     {
+        RequireOrthogonal(tilemap);
         return GenerateFromAllLayers(tilemap, mapX, mapY,
             tileData => tileData.Properties.TryGetValue(propertyName, out _),
             obj => obj.Properties.TryGetValue(propertyName, out _));
+    }
+
+    // TileShapes is a fixed-size rectangular broad-phase grid — it has no representation for the
+    // diamond/staggered cell footprints that isometric, staggered, and hexagonal maps use. Rather
+    // than emit silently-wrong axis-aligned rectangles for those orientations, refuse up front.
+    // Use TileMap.GetCellAt for point-in-tile queries, or place collision objects on an object
+    // layer in Tiled (object-layer scanning is unaffected — it doesn't use the tile grid).
+    private static void RequireOrthogonal(Tilemap tilemap)
+    {
+        if (tilemap.Orientation != TilemapOrientation.Orthogonal)
+            throw new NotSupportedException(
+                $"Collision shape generation is not supported for {tilemap.Orientation} tilemaps " +
+                "(isometric, staggered, hexagonal). Use TileMap.GetCellAt for point-in-tile " +
+                "queries instead, or place collision objects on an object layer in Tiled.");
     }
 
     /// <summary>

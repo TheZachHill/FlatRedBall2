@@ -103,6 +103,37 @@ public class TileMapReloadTests
     }
 
     [Fact]
+    public void TryReload_OrientationChanged_ReturnsFalse_TrackedCollectionUnaffected()
+    {
+        // Regression: a reload that keeps every other structural dimension identical but
+        // switches orientation must force a full restart, not an in-place reload — RegenerateInto
+        // has no NotSupportedException guard, so reloading in place would silently regenerate the
+        // tracked TileShapes as axis-aligned rectangles against isometric (diamond) tile data.
+        var oldMap = BuildTilemap(4, 4, 16, new[] { RectTile(0, "Solid") }, new[] { (0, 0, 0) });
+        var newMap = new Tilemap(
+            name: "test", width: 4, height: 4, tileWidth: 16, tileHeight: 16,
+            orientation: TilemapOrientation.Isometric);
+        var tileset = new TilemapTileset(
+            name: "ts", texture: null!, tileWidth: 16, tileHeight: 16, tileCount: 1, columns: 1);
+        tileset.FirstGlobalId = 1;
+        tileset.AddTileData(RectTile(0, "Solid"));
+        newMap.Tilesets.Add(tileset);
+        var newLayer = new TilemapTileLayer("Main", 4, 4, 16, 16);
+        newLayer.SetTile(0, 0, new TilemapTile(globalId: 1));
+        newMap.Layers.Add(newLayer);
+
+        var tileMap = new TileMap(oldMap);
+        var solid = tileMap.GenerateCollisionFromClass("Solid");
+        var (c, r) = Tsc(0, 0);
+        solid.GetTileAtCell(c, r).ShouldNotBeNull();
+
+        tileMap.TryReload(newMap).ShouldBeFalse();
+
+        // Tracked collection untouched by the rejected reload.
+        solid.GetTileAtCell(c, r).ShouldNotBeNull();
+    }
+
+    [Fact]
     public void TryReload_LayerAdded_ReturnsFalse()
     {
         var oldMap = BuildTilemap(4, 4, 16, new[] { RectTile(0, "Solid") },
