@@ -1354,6 +1354,21 @@
                                     <TextBlock Text="Origin" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
+                            <ToggleButton x:Name="ShowBoundingBoxCheck"
+                                          Height="26"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          IsChecked="True"
+                                          ToolTip.Tip="Show sprite bounding box outline">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Bounding Box" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
                             <!-- Only shown once the user has placed at least one guide (#689) —
                                  see UpdateGuideToggleVisibility in MainWindow.axaml.cs. -->
                             <ToggleButton x:Name="ShowUserGuidesCheck"

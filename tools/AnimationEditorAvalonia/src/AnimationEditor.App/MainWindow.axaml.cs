@@ -2066,6 +2066,9 @@ public partial class MainWindow : Window
         ShowOriginCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
 
+        ShowBoundingBoxCheck.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.ShowBoundingBox = ShowBoundingBoxCheck.IsChecked == true;
+
         ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
         {
             if (_suppressGuideVisibilitySync) return;
