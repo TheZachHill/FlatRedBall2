@@ -823,6 +823,82 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    /// <summary>
+    /// Grid click-to-place (single click or double-click, both routed through
+    /// <c>SnapSelectedFrameToGridCell</c> / <c>ApplyRegionToSelectedFrame</c>) must
+    /// push an undo entry when it actually repositions the selected frame — just
+    /// like a handle drag does via <c>FrameRegionChangedCommand</c>. Silently
+    /// repositioning a frame with no way to undo it is the reported bug.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_RepositionsFrame_RecordsUndoEntry()
+    {
+        var ctx = ResetSingletons();
+        // 4×4 frame at pixel (5,5); snap-click at (20,20) with cellSize=16 moves it to (16,16).
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+
+            Assert.True(ctx.UndoManager.CanUndo,
+                "Repositioning the selected frame via grid click-to-place must record an undo entry.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Undoing after a grid click-to-place reposition must restore the frame's
+    /// exact pre-click UV coordinates.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_RepositionsFrame_UndoRestoresOriginalPosition()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            float origLeft = frame.LeftCoordinate, origTop = frame.TopCoordinate;
+            float origRight = frame.RightCoordinate, origBottom = frame.BottomCoordinate;
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+            Assert.NotEqual(origLeft, frame.LeftCoordinate);   // sanity: it did move
+
+            ctx.UndoManager.Undo();
+
+            Assert.Equal(origLeft,   frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(origTop,    frame.TopCoordinate,    precision: 5);
+            Assert.Equal(origRight,  frame.RightCoordinate,  precision: 5);
+            Assert.Equal(origBottom, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Grid click-to-place at a position that does not actually move the frame
+    /// (already aligned) must not record a no-op undo entry.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_NoActualMovement_DoesNotRecordUndo()
+    {
+        var ctx = ResetSingletons();
+        // Frame already at the grid-aligned origin (0,0) with cellSize=16.
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 0, frameY: 0, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(5f, 5f);   // snaps to (0,0) — same as current origin
+
+            Assert.False(ctx.UndoManager.CanUndo,
+                "Clicking a cell that doesn't change the frame's position must not record undo.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── Resize: dragging a size handle must not snap position ──────────────────
 
     /// <summary>

@@ -1505,12 +1505,23 @@ public class WireframeControl : TextureViewport
         if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
         var frame = _selectedState!.SelectedFrame;
         float w = _bitmap.Width, h = _bitmap.Height;
-        frame.LeftCoordinate   = minX / w;
-        frame.RightCoordinate  = maxX / w;
-        frame.TopCoordinate    = minY / h;
-        frame.BottomCoordinate = maxY / h;
+
+        float bL = frame.LeftCoordinate, bT = frame.TopCoordinate;
+        float bR = frame.RightCoordinate, bB = frame.BottomCoordinate;
+        float aL = minX / w, aT = minY / h, aR = maxX / w, aB = maxY / h;
+
+        frame.LeftCoordinate   = aL;
+        frame.RightCoordinate  = aR;
+        frame.TopCoordinate    = aT;
+        frame.BottomCoordinate = aB;
         RefreshFramesInternal();
         FrameRegionChanged?.Invoke(frame);
+
+        if (RegionChanged(bL, bT, bR, bB, aL, aT, aR, aB))
+        {
+            _undoManager!.Record(new FrameRegionChangedCommand(
+                frame, bL, bT, bR, bB, aL, aT, aR, aB, _appCommands!, _events!));
+        }
     }
 
     /// <summary>
