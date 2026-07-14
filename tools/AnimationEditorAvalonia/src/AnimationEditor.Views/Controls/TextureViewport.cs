@@ -161,9 +161,14 @@ public class TextureViewport : Control, IZoomTarget
 
         private static void DrawGrid(SKCanvas canvas, TextureViewportSnapshot s, SKRect textureDest, CanvasPalette palette)
         {
+            // Fine (minor) lines fade out as the camera zooms out — dense minor lines look
+            // like noise at low zoom (#720). Major lines always render at full opacity.
+            float fineAlphaFactor = GridFadeCalculator.MinorLineAlphaFactor(s.Zoom);
+            byte minorAlpha = (byte)Math.Clamp(MathF.Round(palette.GridLineMinor.Alpha * fineAlphaFactor), 0f, 255f);
+
             using var minorPaint = new SKPaint
             {
-                Color        = palette.GridLineMinor,
+                Color        = palette.GridLineMinor.WithAlpha(minorAlpha),
                 Style        = SKPaintStyle.Stroke,
                 StrokeWidth  = 0.5f,
                 IsAntialias  = true
@@ -198,11 +203,19 @@ public class TextureViewport : Control, IZoomTarget
 
             var (xStart, xIndex) = FirstLine(originX, viewL);
             for (float x = xStart; x <= viewR; x += step, xIndex++)
-                canvas.DrawLine(x, viewT, x, viewB, IsMajor(xIndex) ? majorPaint : minorPaint);
+            {
+                bool major = IsMajor(xIndex);
+                if (major || minorAlpha > 0)
+                    canvas.DrawLine(x, viewT, x, viewB, major ? majorPaint : minorPaint);
+            }
 
             var (yStart, yIndex) = FirstLine(originY, viewT);
             for (float y = yStart; y <= viewB; y += step, yIndex++)
-                canvas.DrawLine(viewL, y, viewR, y, IsMajor(yIndex) ? majorPaint : minorPaint);
+            {
+                bool major = IsMajor(yIndex);
+                if (major || minorAlpha > 0)
+                    canvas.DrawLine(viewL, y, viewR, y, major ? majorPaint : minorPaint);
+            }
 
             // Keep textureDest referenced so callers/tests that pass it stay valid; the full-
             // viewport pass supersedes the old texture-only clip.

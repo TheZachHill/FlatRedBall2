@@ -298,6 +298,61 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    // ── Visual: fine grid fades out when zoomed out (#720) ────────────────────
+
+    /// <summary>
+    /// Issue #720: below the fade-out zoom threshold, minor (fine) grid lines must not
+    /// render at all, while major (coarse) lines keep rendering. With cellSize=40 and
+    /// zoom=0.2, grid step is 8px: minor lines land at screen x=16 (index 2) and a major
+    /// line lands at screen x=32 (index 4, every 4th). Sampling at y=4 avoids the
+    /// horizontal lines and the texture-outline edges (drawn at x=0/y=0).
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_ZoomedOutBelowFadeThreshold_MinorLineNotDrawn_MajorLineStillDrawn()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 40);
+            ctrl.SetCamera(0, 0, 0.2f);
+            using var bmZoomedOut = ctrl.RenderToBitmap(64, 64);
+
+            ctrl.SetGrid(false, 40);
+            using var bmOff = ctrl.RenderToBitmap(64, 64);
+
+            int minorAtZoomedOut = ScanMaxRed(bmZoomedOut, centerX: 16, y: 4);
+            int minorOff         = ScanMaxRed(bmOff,         centerX: 16, y: 4);
+            int majorAtZoomedOut = ScanMaxRed(bmZoomedOut, centerX: 32, y: 4);
+
+            Assert.Equal(minorOff, minorAtZoomedOut);
+            Assert.True(majorAtZoomedOut > minorAtZoomedOut,
+                $"Major line should still render below the fade threshold: major={majorAtZoomedOut}, minor={minorAtZoomedOut}");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// At full zoom (1.0, at/above GridFadeCalculator.FadeStartZoom) the fine grid renders
+    /// at full opacity — unchanged from before #720.
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_FullZoom_MinorLinesStillRenderAtFullOpacity()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            ctrl.SetCamera(0, 0, 1f);
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            int minorBrightness = ScanMaxRed(bm, centerX: 8, y: 4);
+            Assert.True(minorBrightness > 0, "Minor grid line should render at full zoom.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── State ─────────────────────────────────────────────────────────────────
 
     /// <summary>
