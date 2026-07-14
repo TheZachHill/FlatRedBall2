@@ -6187,11 +6187,13 @@ public partial class MainWindow : Window
     /// center-on-frame gesture wins the text-label real estate over an inline rename.
     /// </summary>
     internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
-        => HandleAnimTreeNodeDoubleTap(vm);
+        => HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: true);
 
     /// <summary>
-    /// Double-tap on blank space in a tree row (not the text label, not a Button) →
-    /// toggle expand / collapse.
+    /// Double-tap on blank space in a tree row (not the text label, not a Button) → focus the
+    /// node instead of renaming it (#716). For a chain this fits its frames into the wireframe
+    /// view via <see cref="WireframeControl.FitChainToView"/>; frame/rect/circle already center
+    /// themselves via <see cref="HandleAnimTreeNodeDoubleTap"/>.
     /// </summary>
     private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -6207,20 +6209,25 @@ public partial class MainWindow : Window
         if (src.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
-        if (!HandleAnimTreeNodeDoubleTap(vm)) return;
+        if (!HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: false)) return;
         e.Handled = true;
     }
 
     /// <summary>
     /// Routes a double-tap on a tree node to the appropriate action.
+    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain → inline
+    /// rename) from every other double-tap on the row (chain → focus/fit its frames, #716).
     /// Returns <c>true</c> when a recognised action was performed.
     /// </summary>
-    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm)
+    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm, bool isLabelDoubleTap = false)
     {
         switch (vm.Data)
         {
-            case AnimationChainSave chain:
+            case AnimationChainSave chain when isLabelDoubleTap:
                 BeginInlineRename(vm, chain.Name);
+                return true;
+            case AnimationChainSave chain:
+                WireframeCtrl.FitChainToView(chain);
                 return true;
             case AnimationFrameSave frame:
                 WireframeCtrl.CenterOnFrame(frame);
