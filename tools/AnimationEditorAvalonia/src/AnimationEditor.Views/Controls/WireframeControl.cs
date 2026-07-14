@@ -279,14 +279,6 @@ public class WireframeControl : TextureViewport
     private List<AnimationFrameSave>? _lastRevealedFrames;
     private object? _lastRevealSelectionKey;
 
-    // Resize handles fade in only after the frame-box reveal settles (not during) — the reveal
-    // inflates the box outward by up to StartInflationPixels, which would otherwise visually
-    // overlap/clash with handles sitting just Hs pixels outside the frame's real edge. Handles
-    // stay at their final position throughout (never move with the shrink) since repositioning
-    // them mid-animation risks a user grabbing a handle that's about to jump.
-    private const float HandleFadeDurationSeconds = 0.2f;
-    private float _handleFadeProgress = 1f;
-
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
     private static Cursor AddFrameCursor => _addFrameCursorLazy.Value;
@@ -465,7 +457,6 @@ public class WireframeControl : TextureViewport
     private void BeginSelectionReveal()
     {
         _selectionRevealProgress = 0f;
-        _handleFadeProgress = 0f;
         _selectionRevealTimer ??= CreateSelectionRevealTimer();
         _selectionRevealTimer.Start();
         InvalidateVisual();
@@ -481,53 +472,41 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void ReplaySelectionReveal() => BeginSelectionReveal();
 
-    /// <summary>
-    /// True while the selection-outline reveal (#542) is easing toward rest, or the resize
-    /// handles are still fading in afterward.
-    /// </summary>
-    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f || _handleFadeProgress < 1f;
+    /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
+    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
 
     /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
     public float SelectionRevealProgress => _selectionRevealProgress;
 
-    /// <summary>Test-only: resize-handle fade-in progress (0 = invisible, 1 = fully shown). Stays
-    /// at 0 until <see cref="SelectionRevealProgress"/> reaches 1.</summary>
-    public float HandleFadeProgress => _handleFadeProgress;
+    /// <summary>
+    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown), derived from
+    /// <see cref="SelectionRevealProgress"/> via <see cref="RevealAnimation.HandleAlpha"/> — a
+    /// linear ramp over the tail of the same progress timeline (not a separately-timed
+    /// animation), so the fade always finishes exactly when the shrink does.
+    /// </summary>
+    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionRevealProgress);
 
     /// <summary>
-    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/> — first the
-    /// frame-box shrink, then (only once that settles) the resize-handle fade-in. Returns
-    /// <c>true</c> while either is still animating, <c>false</c> once both are settled. Live
-    /// timer and tests both call this (tests skip the timer for determinism).
+    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
+    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
+    /// both call this (tests skip the timer for determinism).
     /// </summary>
     public bool StepSelectionReveal(float dtSeconds)
     {
-        if (_selectionRevealProgress < 1f)
-        {
-            _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
-        }
-        else if (_handleFadeProgress < 1f)
-        {
-            _handleFadeProgress = RevealAnimation.StepProgress(
-                _handleFadeProgress, dtSeconds, HandleFadeDurationSeconds);
-        }
-        else
-        {
-            return false;
-        }
+        if (_selectionRevealProgress >= 1f) return false;
 
-        bool stillAnimating = _selectionRevealProgress < 1f || _handleFadeProgress < 1f;
-        if (!stillAnimating)
+        _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
+        if (_selectionRevealProgress >= 1f)
             _selectionRevealTimer?.Stop();
 
         InvalidateVisual();
-        return stillAnimating;
+        return _selectionRevealProgress < 1f;
     }
 
     /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
     public void SettleSelectionReveal()
     {
-        for (int i = 0; IsSelectionRevealAnimating && i < 1000; i++)
+        for (int i = 0; _selectionRevealProgress < 1f && i < 1000; i++)
             StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
     }
 
@@ -1113,7 +1092,7 @@ public class WireframeControl : TextureViewport
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
         snap.SelectionRevealProgress = _selectionRevealProgress;
-        snap.HandleAlpha = _handleFadeProgress;
+        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionRevealProgress);
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)

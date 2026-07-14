@@ -77,4 +77,37 @@ public class RevealAnimationTests
     {
         Assert.Equal(RevealAnimation.StartInflationPixels, RevealAnimation.InflationPixels(0f), 3);
     }
+
+    // ── HandleAlpha: resize-handle fade overlapping the tail of the shrink (#716 follow-up) ────
+
+    [Fact]
+    public void HandleAlpha_BeforeStartFraction_IsZero()
+    {
+        // easeOutCubic decelerates hard near t=1, so InflationPixels is already visually
+        // negligible well before progress reaches 1 -- HandleAlpha starts its own ramp partway
+        // through the *same* progress timeline instead of waiting for full settle, so the fade
+        // finishes together with the shrink instead of after a perceptible dead pause.
+        Assert.Equal(0f, RevealAnimation.HandleAlpha(0f));
+        Assert.Equal(0f, RevealAnimation.HandleAlpha(RevealAnimation.HandleFadeStartFraction - 0.05f));
+    }
+
+    [Fact]
+    public void HandleAlpha_AtProgressOne_IsFullyOpaque()
+    {
+        Assert.Equal(1f, RevealAnimation.HandleAlpha(1f), 3);
+    }
+
+    [Fact]
+    public void HandleAlpha_RampsMonotonicallyOverTailFraction()
+    {
+        float prev = RevealAnimation.HandleAlpha(RevealAnimation.HandleFadeStartFraction);
+        Assert.Equal(0f, prev, 3);
+        for (float t = RevealAnimation.HandleFadeStartFraction; t <= 1f; t += 0.05f)
+        {
+            float a = RevealAnimation.HandleAlpha(t);
+            Assert.True(a >= prev - 1e-4f, $"alpha decreased at t={t}: {a} < {prev}");
+            Assert.True(a is >= 0f and <= 1f, $"alpha out of [0,1] at t={t}: {a}");
+            prev = a;
+        }
+    }
 }

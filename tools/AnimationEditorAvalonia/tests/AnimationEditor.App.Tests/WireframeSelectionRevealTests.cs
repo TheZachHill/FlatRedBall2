@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -158,10 +159,10 @@ public class WireframeSelectionRevealTests
         finally { Directory.Delete(dir, true); }
     }
 
-    // ── Resize-handle fade-in only after the frame-box reveal settles (#716 follow-up) ────────
+    // ── Resize-handle fade-in overlaps the tail of the frame-box shrink (#716 follow-up) ───────
 
     [AvaloniaFact]
-    public void HandleFadeProgress_StaysZero_WhileFrameBoxStillShrinking()
+    public void HandleFadeProgress_BeforeStartFraction_IsZero()
     {
         var ctx = ResetSingletons();
         var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
@@ -174,16 +175,23 @@ public class WireframeSelectionRevealTests
 
             ctrl.StepSelectionReveal(0.016f);
 
-            Assert.True(ctrl.SelectionRevealProgress < 1f, "precondition: frame box still shrinking");
+            Assert.True(ctrl.SelectionRevealProgress < RevealAnimation.HandleFadeStartFraction,
+                "precondition: still well before the fade's start fraction");
             Assert.True(ctrl.HandleFadeProgress == 0f,
-                "Handles must stay invisible while the frame box is still shrinking — fading them " +
-                "in during the shrink would overlap the still-inflated outline.");
+                "Handles must stay invisible for the early part of the shrink, while the box is " +
+                "still visibly larger than its final size.");
         }
         finally { Directory.Delete(dir, true); }
     }
 
+    /// <summary>
+    /// easeOutCubic decelerates hard near progress=1, so the box is already visually at rest well
+    /// before the frame-box reveal numerically settles. The handle fade starts partway through
+    /// the *same* progress timeline (see RevealAnimation.HandleAlpha) instead of waiting for full
+    /// settle, so it lands exactly when the shrink does instead of after a dead pause.
+    /// </summary>
     [AvaloniaFact]
-    public void HandleFadeProgress_StartsAdvancing_OnlyAfterFrameBoxSettles()
+    public void HandleFadeProgress_RampsDuringTailOfShrink_AndFinishesExactlyWithIt()
     {
         var ctx = ResetSingletons();
         var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
@@ -192,21 +200,20 @@ public class WireframeSelectionRevealTests
             ctx.SelectedState.SelectedFrame = f1;
             Dispatcher.UIThread.RunJobs();
 
-            // Step past the 1-second frame-box duration so it settles.
-            for (int i = 0; i < 61 && ctrl.SelectionRevealProgress < 1f; i++)
+            // Step until the frame box crosses the fade's start fraction, before it settles.
+            for (int i = 0; i < 61 && ctrl.SelectionRevealProgress < RevealAnimation.HandleFadeStartFraction; i++)
                 ctrl.StepSelectionReveal(1f / 60f);
-            Assert.Equal(1f, ctrl.SelectionRevealProgress);
-            Assert.True(ctrl.HandleFadeProgress == 0f,
-                "The exact tick that settles the frame box only advances that progress — the " +
-                "handle fade starts on the tick after, not the same one.");
 
-            // One more tick: now the handle fade should be under way.
-            ctrl.StepSelectionReveal(1f / 60f);
-
+            Assert.True(ctrl.SelectionRevealProgress is >= RevealAnimation.HandleFadeStartFraction and < 1f,
+                $"precondition: past the start fraction but not yet settled, got {ctrl.SelectionRevealProgress}");
             Assert.True(ctrl.HandleFadeProgress > 0f && ctrl.HandleFadeProgress < 1f,
-                $"expected the handle fade to be under way one tick after the frame box settled, got {ctrl.HandleFadeProgress}");
-            Assert.True(ctrl.IsSelectionRevealAnimating,
-                "Still animating until the handle fade also completes.");
+                $"expected the handle fade under way while the frame box is still finishing its shrink, got {ctrl.HandleFadeProgress}");
+
+            ctrl.SettleSelectionReveal();
+
+            Assert.Equal(1f, ctrl.SelectionRevealProgress);
+            Assert.Equal(1f, ctrl.HandleFadeProgress);
+            Assert.False(ctrl.IsSelectionRevealAnimating);
         }
         finally { Directory.Delete(dir, true); }
     }

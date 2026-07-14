@@ -56,6 +56,30 @@ public static class RevealAnimation
     }
 
     /// <summary>
+    /// Fraction of the reveal's progress (0..1) at which a dependent fade-in (e.g. resize
+    /// handles) starts ramping up, via <see cref="HandleAlpha"/>. easeOutCubic decelerates hard
+    /// near <c>progress=1</c>, so <see cref="InflationPixels"/> is already visually negligible
+    /// well before then — waiting for full settle before starting a dependent animation reads as
+    /// a dead pause. Starting the fade at this fraction and running it to completion by
+    /// <c>progress=1</c> makes the two land together instead.
+    /// </summary>
+    public const float HandleFadeStartFraction = 0.6f;
+
+    /// <summary>
+    /// Opacity (0 = invisible, 1 = fully shown) for a dependent element that should fade in over
+    /// the tail of the reveal — 0 for <paramref name="progress"/> up to
+    /// <see cref="HandleFadeStartFraction"/>, then a linear ramp to 1 at <c>progress=1</c>. A
+    /// short linear tail-fade (rather than a separately-timed animation) guarantees it finishes
+    /// exactly when the reveal does, with no dead time and no independent duration to keep in sync.
+    /// </summary>
+    public static float HandleAlpha(float progress)
+    {
+        float t = Math.Clamp(progress, 0f, 1f);
+        if (t <= HandleFadeStartFraction) return 0f;
+        return (t - HandleFadeStartFraction) / (1f - HandleFadeStartFraction);
+    }
+
+    /// <summary>
     /// Advances <paramref name="progress"/> by one host tick of <paramref name="dtSeconds"/>
     /// toward 1 over <paramref name="durationSeconds"/>. Clamped to [0, 1].
     /// </summary>
