@@ -157,4 +157,57 @@ public class WireframeSelectionRevealTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    // ── Whole-chain selection also highlights + reveals every frame (#716 follow-up) ──────────
+
+    /// <summary>
+    /// Selecting a chain as a whole (the ordinary single-click a tree row already does — no
+    /// double-click, no explicit multi-frame selection) must highlight and reveal every one of
+    /// its frames, the same pulse a single-frame selection gets. Double-click is reserved for
+    /// moving the camera onto them (see MainWindow.HandleAnimTreeNodeDoubleTap).
+    /// </summary>
+    [AvaloniaFact]
+    public void SelectedChain_Change_HighlightsAllFramesAndStartsReveal()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, f0, f1, dir) = BuildTwoFrameCtrl(ctx);
+        try
+        {
+            // BuildTwoFrameCtrl leaves SelectedFrame = f0; selecting the chain as a whole must
+            // supersede that single-frame selection and light up both frames.
+            ctx.SelectedState.SelectedChain = null;
+            ctx.SelectedState.SelectedChain = ctx.ProjectManager.AnimationChainListSave!.AnimationChains[0];
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(ctrl.IsSelectionRevealAnimating,
+                "Selecting a whole chain must restart the shrink-to-rest reveal.");
+
+            var rects = ctrl.GetFrameRects();
+            Assert.Equal(2, rects.Count);
+            Assert.All(rects, r => Assert.True(r.IsSelected,
+                "Every frame of a whole-chain selection must draw with the blue highlight."));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Regression: a single-frame selection shows (and highlights) only that frame, not its
+    /// siblings — unchanged from before the whole-chain-selection behavior was added.
+    /// </summary>
+    [AvaloniaFact]
+    public void SelectedFrame_WithinChain_ShowsOnlyThatFrameSelected()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, f0, f1, dir) = BuildTwoFrameCtrl(ctx);
+        try
+        {
+            ctx.SelectedState.SelectedFrame = f1;
+            Dispatcher.UIThread.RunJobs();
+
+            var rects = ctrl.GetFrameRects();
+            Assert.Single(rects);
+            Assert.True(rects[0].IsSelected);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

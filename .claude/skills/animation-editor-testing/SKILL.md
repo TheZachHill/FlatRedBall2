@@ -20,6 +20,12 @@ Default to a plain `[Fact]` against `AnimationEditor.Core` (`AppCommands`, comma
 
 Tests that do need it construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions — see `WireframePanZoomTests.cs` for the established pattern.
 
+## Reflection-invoking a handler proves the logic, not that input reaches it
+
+`GetMethod(..., NonPublic).Invoke(window, [sender, fakeArgs])` calls a handler directly, bypassing Avalonia's routed-event dispatch — it proves the handler's body is correct, not that real input ever reaches it. This missed a real bug (#716): `OnAnimTreeDoubleTapped` was Bubble-registered on `AnimTree.DoubleTapped` and looked correct under reflection, but a real double-click on a `TreeViewItem` row never fired it — the control's own Tunnel-phase pointer handling toggles `IsExpanded` on the second click first, and that native behavior isn't visible from reading the handler's source. The fix had to move into `OnTreePointerPressed`'s existing Tunnel-phase `PointerPressed` branch instead.
+
+When the question is *whether* a gesture reaches a handler — not just what it does once it's there — drive it for real: `window.MouseDown(point, MouseButton.Left)` / `MouseUp` (twice for a double-click, both from `Avalonia.Headless`), with `point` computed from a real control's `Bounds` via `TranslatePoint`. Reflection is fine for asserting the body once the real path is confirmed; it does not substitute for confirming that path exists.
+
 ## Undo labels vs screenshots
 
 - **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests`.

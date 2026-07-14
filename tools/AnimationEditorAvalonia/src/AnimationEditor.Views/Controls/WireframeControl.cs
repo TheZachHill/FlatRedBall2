@@ -82,7 +82,7 @@ public class WireframeControl : TextureViewport
         using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
-        float revealScale = RevealAnimation.Scale(s.SelectionRevealProgress);
+        float revealInflation = RevealAnimation.InflationPixels(s.SelectionRevealProgress);
 
         foreach (var (bounds, isSelected) in s.Frames)
         {
@@ -91,9 +91,10 @@ public class WireframeControl : TextureViewport
             {
                 frameFill.Color = new SKColor(80, 160, 255, 45);
                 frameStroke.Color = new SKColor(80, 160, 255, 230);
-                // One-shot reveal (#542): same shrink-to-rest as PNG diff boxes (#606).
-                if (revealScale != 1f)
-                    sr = ScaleAround(sr, revealScale);
+                // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the
+                // box's own size) so the pop stays visible at any zoom level.
+                if (revealInflation > 0f)
+                    sr = InflateBy(sr, revealInflation);
             }
             else
             {
@@ -170,14 +171,10 @@ public class WireframeControl : TextureViewport
         }
     }
 
-    // Same screen-space center scale as PngPreviewControl's diff-box reveal (#606).
-    private static SKRect ScaleAround(SKRect r, float scale)
-    {
-        float cx = r.MidX, cy = r.MidY;
-        float halfW = r.Width * 0.5f * scale;
-        float halfH = r.Height * 0.5f * scale;
-        return new SKRect(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
-    }
+    // Expands an already screen-space rect by a fixed number of pixels on every side,
+    // preserving its center — the reveal's growth amount, independent of zoom (#716).
+    private static SKRect InflateBy(SKRect r, float pixels) =>
+        new(r.Left - pixels, r.Top - pixels, r.Right + pixels, r.Bottom + pixels);
 
     private static IEnumerable<SKPoint> HandlePoints(SKRect r)
     {
@@ -400,20 +397,42 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// True when <see cref="ISelectedState.SelectedFrames"/> differs by reference/identity
-    /// from the set that last started a reveal. Updates the remembered set when it changed.
+    /// True when <see cref="ComputeHighlightedFrames"/> differs by reference/identity from the
+    /// set that last started a reveal. Updates the remembered set when it changed.
     /// </summary>
     private bool SelectedFramesIdentityChanged()
     {
-        var current = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
+        var current = ComputeHighlightedFrames();
         if (_lastRevealedFrames is null
             || _lastRevealedFrames.Count != current.Count
             || !_lastRevealedFrames.SequenceEqual(current))
         {
-            _lastRevealedFrames = current.ToList();
+            _lastRevealedFrames = current;
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The frames that draw with the blue "selected" highlight and get the shrink-to-rest
+    /// reveal (#542): the multi-frame selection bag/single frame, or — when nothing more
+    /// specific is selected — every frame of a single whole-chain selection, so selecting a
+    /// chain "plays" the same pulse a frame selection gets (#716). A multi-chain selection is
+    /// still drawn (see <see cref="RefreshFramesInternal"/>'s framesToShow) but not highlighted;
+    /// there's no single chain to attribute the pulse to.
+    /// </summary>
+    private List<AnimationFrameSave> ComputeHighlightedFrames()
+    {
+        var selectedFrame  = _selectedState?.SelectedFrame;
+        var selectedFrames = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
+        var selectedChain  = _selectedState?.SelectedChain;
+        var selectedChains = _selectedState?.SelectedChains;
+
+        if (selectedFrames.Count > 1) return selectedFrames;
+        if (selectedFrame != null) return new List<AnimationFrameSave> { selectedFrame };
+        if (selectedChains?.Count > 0) return new List<AnimationFrameSave>();
+        if (selectedChain?.Frames != null) return new List<AnimationFrameSave>(selectedChain.Frames);
+        return new List<AnimationFrameSave>();
     }
 
     /// <summary>Resets reveal progress to 0 and starts the timer (mirrors PngPreviewControl).</summary>
@@ -1603,6 +1622,8 @@ public class WireframeControl : TextureViewport
         else
             framesToShow = Array.Empty<AnimationFrameSave>();
 
+        var highlightedFrames = ComputeHighlightedFrames();
+
         float w = _bitmap.Width;
         float h = _bitmap.Height;
 
@@ -1629,7 +1650,7 @@ public class WireframeControl : TextureViewport
             {
                 Frame      = frame,
                 Bounds     = new SKRect(pixL, pixT, pixR, pixB),
-                IsSelected = selectedFrames.Contains(frame)
+                IsSelected = highlightedFrames.Contains(frame)
             });
         }
 

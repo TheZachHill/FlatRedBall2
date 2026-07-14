@@ -6248,13 +6248,11 @@ public partial class MainWindow : Window
                 BeginInlineRename(vm, chain.Name);
                 return true;
             case AnimationChainSave chain:
-                // Multi-select every frame in the chain so RefreshFramesInternal draws all of
-                // them (not just the primary selection) and the identity change restarts the
-                // same shrink-to-rest reveal (#542) a single-frame selection gets — the box
-                // starts bigger and eases down, applied to every frame at once. No-op for an
-                // empty chain: SelectedNodes stays empty and FitChainToView already no-ops.
-                if (chain.Frames.Count > 0)
-                    _selectedState.SelectedNodes = chain.Frames.Cast<object>().ToList();
+                // Selecting the chain (the click that preceded this double-click) already makes
+                // every one of its frames draw highlighted with the shrink-to-rest reveal (#542)
+                // — see WireframeControl.ComputeHighlightedFrames. Double-click's only remaining
+                // job is moving the camera onto them (#716). No-op for an empty chain:
+                // FitChainToView already no-ops with nothing to fit.
                 WireframeCtrl.FitChainToView(chain);
                 return true;
             case AnimationFrameSave frame:

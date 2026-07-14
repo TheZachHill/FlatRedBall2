@@ -47,4 +47,34 @@ public class RevealAnimationTests
             p = RevealAnimation.StepProgress(p, RevealAnimation.DefaultIntervalSeconds);
         Assert.Equal(1f, p);
     }
+
+    // ── InflationPixels: screen-space pixel growth (#716 follow-up) ────────────
+
+    [Fact]
+    public void InflationPixels_GrowsThenSettles_NeverBelowZero()
+    {
+        // Same grow-and-settle shape as Scale, but expressed as a fixed pixel amount so the
+        // pop stays visible regardless of the viewport's current zoom (a box that's tiny
+        // on-screen when zoomed out still gets the same absolute-pixel bump).
+        float prev = RevealAnimation.InflationPixels(0f);
+        for (int i = 1; i <= 100; i++)
+        {
+            float px = RevealAnimation.InflationPixels(i / 100f);
+            Assert.True(px >= -1e-4f, $"inflation went negative at t={i / 100f}: {px}");
+            Assert.True(px <= prev + 1e-4f, $"inflation grew instead of settling at t={i / 100f}");
+            prev = px;
+        }
+    }
+
+    [Fact]
+    public void InflationPixels_ProgressOne_SettlesToZero()
+    {
+        Assert.Equal(0f, RevealAnimation.InflationPixels(1f), 3);
+    }
+
+    [Fact]
+    public void InflationPixels_ProgressZero_StartsAtMaxPixels()
+    {
+        Assert.Equal(RevealAnimation.StartInflationPixels, RevealAnimation.InflationPixels(0f), 3);
+    }
 }

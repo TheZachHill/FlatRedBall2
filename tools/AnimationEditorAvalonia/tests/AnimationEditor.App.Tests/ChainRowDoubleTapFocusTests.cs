@@ -22,11 +22,19 @@ namespace AnimationEditor.App.Tests;
 /// Bubble-registered DoubleTapped handler on an ancestor like AnimTree ever sees the gesture — so
 /// a fix routed only through OnAnimTreeDoubleTapped's chain case is unreachable in practice. The
 /// real fix lives in MainWindow.OnTreePointerPressed's existing Tunnel-phase ClickCount==2 branch
-/// (the same place frame double-click-to-center already worked reliably), which now also handles
-/// chains: selects all the chain's frames (so they draw with the shrink-to-rest reveal, #542) and
-/// fits them into the wireframe view, instead of leaving the native expand/collapse race in place.
+/// (the same place frame double-click-to-center already worked reliably): double-click's only job
+/// is moving the camera onto the chain's frames via WireframeControl.FitChainToView.
+///
+/// Selecting/highlighting every frame (so they draw with the shrink-to-rest reveal, #542) is a
+/// *single*-click concern instead, and needs no MainWindow-specific wiring at all: an ordinary
+/// tree click already sets ISelectedState.SelectedChain, and WireframeControl.ComputeHighlightedFrames
+/// treats a whole-chain selection as "every one of its frames is highlighted" — see
+/// WireframeSelectionRevealTests for that half. Reusing SelectedNodes for this (the previous
+/// approach) would have clobbered the chain multi-select bag on every plain click.
+///
 /// These tests drive real MouseDown/MouseUp double-clicks (not reflection) so they exercise the
-/// actual pointer routing, not just the isolated dispatch method.
+/// actual pointer routing, not just the isolated dispatch method — see the postmortem in
+/// .claude/skills/animation-editor-testing/SKILL.md for why reflection alone missed this class of bug.
 /// </summary>
 public class ChainRowDoubleTapFocusTests
 {
@@ -127,93 +135,7 @@ public class ChainRowDoubleTapFocusTests
             // long as focus happens too (#716).
             Assert.False(chainNode.IsEditing,
                 "Double-click on blank row space must not start an inline rename.");
-            Assert.Contains(chain.Frames[0], ctx.SelectedState.SelectedFrames);
-        }
-        finally { window.Close(); Directory.Delete(dir, true); }
-    }
-
-    /// <summary>
-    /// Focusing a chain selects all of its frames so every one draws with the same shrink-to-rest
-    /// reveal (#542) a single-frame selection already gets, rather than a silent camera jump.
-    /// </summary>
-    [AvaloniaFact]
-    public void DoubleClickBlankRowSpace_OnChainWithFrames_SelectsAllFramesAndStartsReveal()
-    {
-        var (window, ctx) = CreateWindow();
-        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var chain = new AnimationChainSave { Name = "Walk" };
-            var f0 = new AnimationFrameSave { LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f };
-            var f1 = new AnimationFrameSave { LeftCoordinate = 0.4f, TopCoordinate = 0.1f, RightCoordinate = 0.6f, BottomCoordinate = 0.3f };
-            chain.Frames.Add(f0);
-            chain.Frames.Add(f1);
-            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
-
-            TriggerRefreshTreeView(window);
-
-            var tree = GetTree(window);
-            var chainNode = (TreeNodeVm)tree.ItemsSource!.Cast<object>().First();
-
-            var tvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
-                .First(t => ReferenceEquals(t.DataContext, chainNode));
-            var metaLabel = GetMetaLabel(tvi, chainNode);
-
-            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")
-                ?? throw new InvalidOperationException("WireframeCtrl not found");
-            var texPath = WriteSolidPng(dir, "tex.png", 1000, 1000);
-            wireframe.LoadTexture(texPath);
-            Dispatcher.UIThread.RunJobs();
-            wireframe.SettleSelectionReveal();
-
-            RealDoubleClick(window, metaLabel);
-
-            Assert.Equal(new[] { f0, f1 }, ctx.SelectedState.SelectedFrames);
-            Assert.True(wireframe.IsSelectionRevealAnimating,
-                "Focusing a chain must restart the shrink-to-rest reveal for its frames.");
-        }
-        finally { window.Close(); Directory.Delete(dir, true); }
-    }
-
-    [AvaloniaFact]
-    public void DoubleClickBlankRowSpace_OnEmptyChain_DoesNothing()
-    {
-        var (window, ctx) = CreateWindow();
-        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        try
-        {
-            var chain = new AnimationChainSave { Name = "Empty" };
-            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
-
-            TriggerRefreshTreeView(window);
-
-            var tree = GetTree(window);
-            var chainNode = (TreeNodeVm)tree.ItemsSource!.Cast<object>().First();
-
-            var tvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
-                .First(t => ReferenceEquals(t.DataContext, chainNode));
-            var metaLabel = GetMetaLabel(tvi, chainNode);
-
-            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")
-                ?? throw new InvalidOperationException("WireframeCtrl not found");
-            var texPath = WriteSolidPng(dir, "tex.png", 1000, 1000);
-            wireframe.LoadTexture(texPath);
-            Dispatcher.UIThread.RunJobs();
-            wireframe.SettleSelectionReveal();
-            wireframe.SetCamera(12f, 34f, 2f);
-
-            RealDoubleClick(window, metaLabel);
-
-            Assert.False(chainNode.IsEditing);
-            var (panX, panY, zoom) = wireframe.CameraState;
-            Assert.Equal(12f, panX, 3);
-            Assert.Equal(34f, panY, 3);
-            Assert.Equal(2f, zoom, 3);
-            // The row's normal click-to-select behavior still puts the chain itself into
-            // SelectedNodes — only frame multi-select (what our fix would add) must stay empty.
-            Assert.Empty(ctx.SelectedState.SelectedFrames);
+            Assert.Same(chain, ctx.SelectedState.SelectedChain);
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }
