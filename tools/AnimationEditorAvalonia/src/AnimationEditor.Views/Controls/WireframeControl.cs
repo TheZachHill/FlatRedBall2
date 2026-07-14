@@ -430,7 +430,11 @@ public class WireframeControl : TextureViewport
 
         if (selectedFrames.Count > 1) return selectedFrames;
         if (selectedFrame != null) return new List<AnimationFrameSave> { selectedFrame };
-        if (selectedChains?.Count > 0) return new List<AnimationFrameSave>();
+        // A plain single-click on a chain also puts that one chain into SelectedNodes (the tree's
+        // normal SelectedItems sync), so SelectedChains always has exactly 1 entry for an ordinary
+        // single selection — that must still highlight the chain's frames. Only 2+ chains (a real
+        // Ctrl/Shift multi-select) means "no single chain to attribute the pulse to."
+        if (selectedChains?.Count > 1) return new List<AnimationFrameSave>();
         if (selectedChain?.Frames != null) return new List<AnimationFrameSave>(selectedChain.Frames);
         return new List<AnimationFrameSave>();
     }

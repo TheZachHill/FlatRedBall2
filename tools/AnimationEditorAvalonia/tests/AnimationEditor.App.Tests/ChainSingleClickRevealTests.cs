@@ -1,0 +1,177 @@
+using System.Reflection;
+using AnimationEditor.App.Controls;
+using AnimationEditor.Core.ViewModels;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using FlatRedBall2.Animation.Content;
+using SkiaSharp;
+using Xunit;
+
+namespace AnimationEditor.App.Tests;
+
+/// <summary>
+/// Regression for a real bug missed by <see cref="WireframeSelectionRevealTests"/> (which set
+/// <c>ISelectedState.SelectedChain</c> directly instead of driving a real tree click):
+/// <c>MainWindow.OnTreeSelectionChanged</c> syncs the tree's <c>SelectedItems</c> into
+/// <c>ISelectedState.SelectedNodes</c> on *every* selection change, including an ordinary single
+/// click — so a plain chain click always puts that one chain into <c>SelectedChains</c> too
+/// (count == 1), not just a genuine Ctrl/Shift multi-select. The first cut of
+/// <c>WireframeControl.ComputeHighlightedFrames</c> treated any non-empty <c>SelectedChains</c>
+/// as "multi-chain selection, don't highlight," which silently swallowed the single-click case:
+/// the reveal timer still started (frame identity changed from the prior state), but every frame
+/// rendered with <c>IsSelected=false</c>, so nothing visibly grew-then-shrank.
+///
+/// These tests drive real MouseDown/MouseUp clicks through the actual tree (not reflection or a
+/// direct model assignment) so they exercise the real SelectedNodes/SelectedChain interaction.
+/// </summary>
+public class ChainSingleClickRevealTests
+{
+    private static (MainWindow Window, TestServices Ctx) CreateWindow()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return (window, ctx);
+    }
+
+    private static void TriggerRefreshTreeView(MainWindow window)
+    {
+        typeof(MainWindow).GetMethod("RefreshTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(window, null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static string WriteSolidPng(string dir, string name, int width, int height)
+    {
+        var path = Path.Combine(dir, name);
+        using var bm = new SKBitmap(width, height);
+        bm.Erase(SKColors.Blue);
+        using var data = bm.Encode(SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
+    private static void RealSingleClick(MainWindow window, Control target)
+    {
+        var local = new Point(target.Bounds.Width / 2, target.Bounds.Height / 2);
+        var p = target.TranslatePoint(local, window)!.Value;
+        window.MouseDown(p, MouseButton.Left);
+        window.MouseUp(p, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>
+    /// Builds a two-frame chain, wires a loaded texture, and returns the window/context plus the
+    /// chain's header label and frame-0's row (both real, realized tree controls to click on).
+    /// </summary>
+    private static (MainWindow Window, TestServices Ctx, TreeNodeVm ChainNode, Control ChainHeaderLabel,
+        TreeViewItem FrameTvi, WireframeControl Wireframe, string Dir) BuildTwoFrameChainWindow()
+    {
+        var (window, ctx) = CreateWindow();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var f0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f };
+        var f1 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.4f, TopCoordinate = 0.1f, RightCoordinate = 0.6f, BottomCoordinate = 0.3f };
+        chain.Frames.Add(f0);
+        chain.Frames.Add(f1);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+        var texPath = WriteSolidPng(dir, "tex.png", 1000, 1000);
+        ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+        TriggerRefreshTreeView(window);
+
+        var tree = window.FindControl<TreeView>("AnimTree")!;
+        var chainNode = (TreeNodeVm)tree.ItemsSource!.Cast<object>().First();
+        chainNode.IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+        wireframe.LoadTexture(texPath);
+        Dispatcher.UIThread.RunJobs();
+
+        var chainTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+            .First(t => ReferenceEquals(t.DataContext, chainNode));
+        var chainHeaderLabel = chainTvi.GetVisualDescendants().OfType<TextBlock>()
+            .First(tb => ReferenceEquals(tb.DataContext, chainNode) && tb.Name == "RowHeaderLabel");
+
+        var frameTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+            .First(t => ReferenceEquals(t.DataContext, chainNode.Children[0]));
+
+        return (window, ctx, chainNode, chainHeaderLabel, frameTvi, wireframe, dir);
+    }
+
+    [AvaloniaFact]
+    public void SingleClick_ChainRow_FromFreshState_HighlightsAllFramesAndStartsReveal()
+    {
+        var (window, ctx, chainNode, chainHeaderLabel, _, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, chainHeaderLabel);
+
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Clicking a chain must start the shrink-to-rest reveal.");
+            var rects = wireframe.GetFrameRects();
+            Assert.Equal(2, rects.Count);
+            Assert.All(rects, r => Assert.True(r.IsSelected,
+                "Every frame of a single-clicked chain must draw with the blue highlight."));
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// The exact repro reported against the previous fix: select a frame, then click back to the
+    /// owning chain. Toggling must re-highlight and re-reveal every frame, not silently no-op.
+    /// </summary>
+    [AvaloniaFact]
+    public void SingleClick_ChainRow_AfterFrameWasSelected_HighlightsAllFramesAndStartsReveal()
+    {
+        var (window, ctx, chainNode, chainHeaderLabel, frameTvi, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, frameTvi);
+            wireframe.SettleSelectionReveal();
+            Assert.NotNull(ctx.SelectedState.SelectedFrame);
+
+            RealSingleClick(window, chainHeaderLabel);
+
+            Assert.Null(ctx.SelectedState.SelectedFrame);
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Toggling from a frame back to its chain must restart the reveal.");
+            var rects = wireframe.GetFrameRects();
+            Assert.Equal(2, rects.Count);
+            Assert.All(rects, r => Assert.True(r.IsSelected));
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    /// <summary>Regression: toggling the other direction (chain -> frame) still isolates just that frame.</summary>
+    [AvaloniaFact]
+    public void SingleClick_FrameRow_AfterChainWasSelected_IsolatesThatFrame()
+    {
+        var (window, ctx, chainNode, chainHeaderLabel, frameTvi, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, chainHeaderLabel);
+            wireframe.SettleSelectionReveal();
+
+            RealSingleClick(window, frameTvi);
+
+            Assert.Same(chainNode.Children[0].Data, ctx.SelectedState.SelectedFrame);
+            var rects = wireframe.GetFrameRects();
+            Assert.Single(rects);
+            Assert.True(rects[0].IsSelected);
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+}

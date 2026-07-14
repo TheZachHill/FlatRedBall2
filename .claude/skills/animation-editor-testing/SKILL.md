@@ -26,6 +26,8 @@ Tests that do need it construct `MainWindow` and drive it with `Dispatcher.UIThr
 
 When the question is *whether* a gesture reaches a handler — not just what it does once it's there — drive it for real: `window.MouseDown(point, MouseButton.Left)` / `MouseUp` (twice for a double-click, both from `Avalonia.Headless`), with `point` computed from a real control's `Bounds` via `TranslatePoint`. Reflection is fine for asserting the body once the real path is confirmed; it does not substitute for confirming that path exists.
 
+The same trap applies to directly assigning `ISelectedState` properties (`ctx.SelectedState.SelectedChain = chain`) instead of clicking the tree: a real click also runs `MainWindow.OnTreeSelectionChanged`, which syncs `AnimTree.SelectedItems` into `SelectedState.SelectedNodes` as a side effect — so `SelectedChains` is never empty after a real click, even a plain single-click single-selection. A follow-up bug on #716 slipped through exactly this way: a direct-assignment test asserted the reveal fired correctly, but a real click left every frame `IsSelected=false` because the selection-derived `SelectedChains` (populated only by the real click's `SelectedNodes` sync, not by direct assignment) fed a branch the direct-assignment test never exercised. When a test's setup is "select this thing," prefer clicking the real `TreeViewItem`/header label over setting the model field directly — the click's side effects on sibling `SelectedState` fields are often exactly what's under test.
+
 ## Undo labels vs screenshots
 
 - **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests`.
