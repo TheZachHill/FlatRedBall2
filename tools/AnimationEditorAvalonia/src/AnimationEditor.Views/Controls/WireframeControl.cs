@@ -65,6 +65,10 @@ public class WireframeControl : TextureViewport
         /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
         /// </summary>
         public float SelectionRevealProgress = 1f;
+        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Stays 0 until
+        /// <see cref="SelectionRevealProgress"/> reaches 1, so handles never overlap the
+        /// still-inflated frame outline.</summary>
+        public float HandleAlpha = 1f;
     }
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
@@ -119,9 +123,9 @@ public class WireframeControl : TextureViewport
                 canvas.DrawRect(SnapToScreen(bounds, s), cutPaint);
         }
 
-        // Resize handles on selected frame
-        if (s.SelectedHandleBounds.HasValue)
-            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s));
+        // Resize handles on selected frame — faded in (#716), not drawn at all once invisible.
+        if (s.SelectedHandleBounds.HasValue && s.HandleAlpha > 0f)
+            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s), s.HandleAlpha);
 
         // Magic-wand / grid-snap preview rectangle
         if (s.ShowPreview)
@@ -158,10 +162,11 @@ public class WireframeControl : TextureViewport
 
     private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
 
-    private static void DrawHandles(SKCanvas canvas, SKRect sr)
+    private static void DrawHandles(SKCanvas canvas, SKRect sr, float alpha = 1f)
     {
-        using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
-        using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+        byte a = (byte)(Math.Clamp(alpha, 0f, 1f) * 255);
+        using var fill = new SKPaint { Color = SKColors.White.WithAlpha(a), Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = SKColors.DodgerBlue.WithAlpha(a), Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
         foreach (var pt in HandlePoints(sr))
         {
@@ -273,6 +278,14 @@ public class WireframeControl : TextureViewport
     private float _selectionRevealProgress = 1f;
     private List<AnimationFrameSave>? _lastRevealedFrames;
     private object? _lastRevealSelectionKey;
+
+    // Resize handles fade in only after the frame-box reveal settles (not during) — the reveal
+    // inflates the box outward by up to StartInflationPixels, which would otherwise visually
+    // overlap/clash with handles sitting just Hs pixels outside the frame's real edge. Handles
+    // stay at their final position throughout (never move with the shrink) since repositioning
+    // them mid-animation risks a user grabbing a handle that's about to jump.
+    private const float HandleFadeDurationSeconds = 0.2f;
+    private float _handleFadeProgress = 1f;
 
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
@@ -452,6 +465,7 @@ public class WireframeControl : TextureViewport
     private void BeginSelectionReveal()
     {
         _selectionRevealProgress = 0f;
+        _handleFadeProgress = 0f;
         _selectionRevealTimer ??= CreateSelectionRevealTimer();
         _selectionRevealTimer.Start();
         InvalidateVisual();
@@ -467,33 +481,53 @@ public class WireframeControl : TextureViewport
     /// </summary>
     public void ReplaySelectionReveal() => BeginSelectionReveal();
 
-    /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
-    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
+    /// <summary>
+    /// True while the selection-outline reveal (#542) is easing toward rest, or the resize
+    /// handles are still fading in afterward.
+    /// </summary>
+    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f || _handleFadeProgress < 1f;
 
     /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
     public float SelectionRevealProgress => _selectionRevealProgress;
 
+    /// <summary>Test-only: resize-handle fade-in progress (0 = invisible, 1 = fully shown). Stays
+    /// at 0 until <see cref="SelectionRevealProgress"/> reaches 1.</summary>
+    public float HandleFadeProgress => _handleFadeProgress;
+
     /// <summary>
-    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
-    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
-    /// both call this (tests skip the timer for determinism).
+    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/> — first the
+    /// frame-box shrink, then (only once that settles) the resize-handle fade-in. Returns
+    /// <c>true</c> while either is still animating, <c>false</c> once both are settled. Live
+    /// timer and tests both call this (tests skip the timer for determinism).
     /// </summary>
     public bool StepSelectionReveal(float dtSeconds)
     {
-        if (_selectionRevealProgress >= 1f) return false;
+        if (_selectionRevealProgress < 1f)
+        {
+            _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
+        }
+        else if (_handleFadeProgress < 1f)
+        {
+            _handleFadeProgress = RevealAnimation.StepProgress(
+                _handleFadeProgress, dtSeconds, HandleFadeDurationSeconds);
+        }
+        else
+        {
+            return false;
+        }
 
-        _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
-        if (_selectionRevealProgress >= 1f)
+        bool stillAnimating = _selectionRevealProgress < 1f || _handleFadeProgress < 1f;
+        if (!stillAnimating)
             _selectionRevealTimer?.Stop();
 
         InvalidateVisual();
-        return _selectionRevealProgress < 1f;
+        return stillAnimating;
     }
 
     /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
     public void SettleSelectionReveal()
     {
-        for (int i = 0; _selectionRevealProgress < 1f && i < 1000; i++)
+        for (int i = 0; IsSelectionRevealAnimating && i < 1000; i++)
             StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
     }
 
@@ -1079,6 +1113,7 @@ public class WireframeControl : TextureViewport
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
         snap.SelectionRevealProgress = _selectionRevealProgress;
+        snap.HandleAlpha = _handleFadeProgress;
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
