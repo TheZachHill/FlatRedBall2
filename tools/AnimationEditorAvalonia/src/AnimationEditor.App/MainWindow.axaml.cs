@@ -223,7 +223,7 @@ public partial class MainWindow : Window
         WireTabBar();
         WireDefaultHandlerBanner();
 
-        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
@@ -326,7 +326,7 @@ public partial class MainWindow : Window
             row.Children.Add(closeBtn);
             tabBorder.Child = row;
 
-            // Attach a single managed ContextMenu (right-click → Detach / Close).  Letting Avalonia
+            // Attach a single managed ContextMenu (right-click → Detach / Copy / Close).  Letting Avalonia
             // own the menu via the ContextMenu property — rather than constructing and Open()-ing a
             // fresh ContextMenu on every right-click PointerPressed — is what prevents the menus from
             // stacking and failing to dismiss (issue #472): Avalonia reuses this one instance and
@@ -340,6 +340,14 @@ public partial class MainWindow : Window
                     Header = "Detach to New Window",
                     Command = new RelayCommand(() => DetachTab(captured)),
                 });
+            // Issue #546: same action as the title-bar "Copy Full Path", but for the right-clicked
+            // tab (which may not be the active one).
+            tabMenu.Items.Add(new MenuItem
+            {
+                Header = "Copy Full Path",
+                Command = new RelayCommand(() =>
+                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured.Path.FullPath)),
+            });
             tabMenu.Items.Add(new MenuItem
             {
                 Header = "Close Tab",
@@ -3388,7 +3396,14 @@ public partial class MainWindow : Window
         if (sel is not null)
             TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
-        if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
+        // Exact-match check (not just Contains): a stale multi-selection can already contain
+        // target alongside other nodes, in which case Contains(target) alone would wrongly
+        // treat the tree as already synced and leave the other nodes selected (#727).
+        bool alreadySynced = target is not null
+            && AnimTree.SelectedItems?.Count == 1
+            && ReferenceEquals(AnimTree.SelectedItems[0], target);
+
+        if (target is not null && !alreadySynced)
         {
             // This is a one-way push of model selection into the tree. Suppress OnTreeSelectionChanged
             // so the assignment doesn't loop back through SelectedNodes/RouteNodeSelection and re-fire
@@ -3399,7 +3414,13 @@ public partial class MainWindow : Window
             _suppressTreeSelectionHandling = true;
             try
             {
-                WithPreservedAnimTreeScroll(() => AnimTree.SelectedItem = target);
+                // Clear + Add (rather than just SelectedItem = target) so any other stale
+                // selected nodes are actually dropped, mirroring SyncTreeMultiSelection.
+                WithPreservedAnimTreeScroll(() =>
+                {
+                    AnimTree.SelectedItems!.Clear();
+                    AnimTree.SelectedItems.Add(target);
+                });
             }
             finally { _suppressTreeSelectionHandling = prior; }
         }
@@ -4373,19 +4394,30 @@ public partial class MainWindow : Window
 
             if (rect is not null)
             {
-                PropRectName.Text    = rect.Name   ?? "";
-                PropRectX.Value      = (decimal)rect.X;
-                PropRectY.Value      = (decimal)rect.Y;
-                PropRectScaleX.Value = (decimal)rect.ScaleX;
-                PropRectScaleY.Value = (decimal)rect.ScaleY;
+                // Multi-selected rects can disagree on a property, same as multi-selected frames
+                // (#571) — show that field blank with a "(mixed)" placeholder instead of one rect's
+                // value; editing it then applies the new value to every selected rect. Name has no
+                // legitimate "mixed" display since it isn't numeric, so it's just disabled instead
+                // (see ApplyRectProps for why a shared literal name isn't applied across a batch).
+                var rects = _selectedState.SelectedRectangles;
+                bool rectsMulti = rects.Count > 1;
+                PropRectName.IsEnabled = !rectsMulti;
+                PropRectName.Text = rectsMulti ? "(multiple)" : (rect.Name ?? "");
+                SetValueOrMixed(PropRectX, rects.Select(r => (decimal)r.X).ToList());
+                SetValueOrMixed(PropRectY, rects.Select(r => (decimal)r.Y).ToList());
+                SetValueOrMixed(PropRectScaleX, rects.Select(r => (decimal)r.ScaleX).ToList());
+                SetValueOrMixed(PropRectScaleY, rects.Select(r => (decimal)r.ScaleY).ToList());
             }
 
             if (circ is not null)
             {
-                PropCircleName.Text    = circ.Name   ?? "";
-                PropCircleX.Value      = (decimal)circ.X;
-                PropCircleY.Value      = (decimal)circ.Y;
-                PropCircleRadius.Value = (decimal)circ.Radius;
+                var circles = _selectedState.SelectedCircles;
+                bool circlesMulti = circles.Count > 1;
+                PropCircleName.IsEnabled = !circlesMulti;
+                PropCircleName.Text = circlesMulti ? "(multiple)" : (circ.Name ?? "");
+                SetValueOrMixed(PropCircleX, circles.Select(c => (decimal)c.X).ToList());
+                SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
+                SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
             }
         }
         finally
@@ -4496,27 +4528,35 @@ public partial class MainWindow : Window
     private void ApplyRectProps()
     {
         if (_suppressPropRefresh) return;
-        var rect = _selectedState.SelectedRectangle;
-        if (rect is null || !PropRectX.Value.HasValue || !PropRectY.Value.HasValue ||
-            !PropRectScaleX.Value.HasValue || !PropRectScaleY.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetRectProps(frame, rect,
-            PropRectName.Text ?? "",
-            (float)PropRectX.Value.Value, (float)PropRectY.Value.Value,
-            (float)PropRectScaleX.Value.Value, (float)PropRectScaleY.Value.Value);
+        var rects = _selectedState.SelectedRectangles;
+        if (rects.Count == 0) return;
+
+        // A null component here means "still showing (mixed), not edited" — leave that axis alone
+        // per-rect. Name is only applied for a single selected rect: propagating one literal name
+        // to every rect in a multi-selection would clobber their distinct names (PropRectName is
+        // disabled in RefreshPropertyPanel whenever more than one rect is selected).
+        float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
+        float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
+        float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
+        float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
+        string? name = rects.Count == 1 ? (PropRectName.Text ?? "") : null;
+
+        _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
     }
 
     private void ApplyCircleProps()
     {
         if (_suppressPropRefresh) return;
-        var circ = _selectedState.SelectedCircle;
-        if (circ is null || !PropCircleX.Value.HasValue || !PropCircleY.Value.HasValue ||
-            !PropCircleRadius.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetCircleProps(frame, circ,
-            PropCircleName.Text ?? "",
-            (float)PropCircleX.Value.Value, (float)PropCircleY.Value.Value,
-            (float)PropCircleRadius.Value.Value);
+        var circles = _selectedState.SelectedCircles;
+        if (circles.Count == 0) return;
+
+        // See ApplyRectProps for the null-means-"don't touch" / single-selection-only-name semantics.
+        float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
+        float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
+        float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
+        string? name = circles.Count == 1 ? (PropCircleName.Text ?? "") : null;
+
+        _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
     }
 
     // ── Playback controls wiring ──────────────────────────────────────────────
