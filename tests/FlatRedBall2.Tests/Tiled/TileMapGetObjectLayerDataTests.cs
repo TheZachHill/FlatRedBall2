@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using FlatRedBall2.Tiled;
 using MonoGame.Extended.Tilemaps;
 using Shouldly;
@@ -49,18 +50,44 @@ public class TileMapGetObjectLayerDataTests
     }
 
     [Fact]
-    public void GetObjectLayerData_PolygonObject_IsOmitted()
+    public void GetObjectLayerData_PolygonObject_ReturnsWorldSpacePoints()
     {
+        // Local triangle (0,0),(16,16),(0,16) at Tiled position (16,0), map at origin.
+        // World point = (mapX + Position.X + localX, mapY - (Position.Y + localY)) — no
+        // rotation applied, consistent with this method ignoring Rotation for every object type.
+        var polyObj = new TilemapPolygonObject(
+            id: 1, position: new XnaVec2(16, 0),
+            points: new[] { new XnaVec2(0, 0), new XnaVec2(16, 16), new XnaVec2(0, 16) }) { Class = "Zone" };
+        polyObj.Properties.SetString("Terrain", "reef");
         var layer = new TilemapObjectLayer("Water");
-        layer.AddObject(new TilemapRectangleObject(id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16)));
-        layer.AddObject(new TilemapPolygonObject(
-            id: 2, position: new XnaVec2(32, 0), points: new[] { new XnaVec2(0, 0), new XnaVec2(16, 16), new XnaVec2(0, 16) }));
+        layer.AddObject(polyObj);
         var tileMap = new TileMap(BuildObjectOnlyTilemap(2, 2, 16, layer));
 
         var entries = tileMap.GetObjectLayerData("Water");
 
         entries.Count.ShouldBe(1);
-        entries[0].Width.ShouldBe(16f);
+        entries[0].Points.ShouldNotBeNull();
+        entries[0].Points!.Count.ShouldBe(3);
+        entries[0].Points![0].ShouldBe(new Vector2(16f, 0f));
+        entries[0].Points![1].ShouldBe(new Vector2(32f, -16f));
+        entries[0].Points![2].ShouldBe(new Vector2(16f, -16f));
+        entries[0].Width.ShouldBe(0f);
+        entries[0].Height.ShouldBe(0f);
+        entries[0].GlobalId.ShouldBe(0);
+        entries[0].Class.ShouldBe("Zone");
+        entries[0].Properties["Terrain"].ShouldBe("reef");
+    }
+
+    [Fact]
+    public void GetObjectLayerData_RectangleObject_PointsIsNull()
+    {
+        var layer = new TilemapObjectLayer("Water");
+        layer.AddObject(new TilemapRectangleObject(id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16)));
+        var tileMap = new TileMap(BuildObjectOnlyTilemap(2, 2, 16, layer));
+
+        var entries = tileMap.GetObjectLayerData("Water");
+
+        entries[0].Points.ShouldBeNull();
     }
 
     [Fact]

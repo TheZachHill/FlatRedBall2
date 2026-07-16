@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace FlatRedBall2.Tiled;
 
@@ -15,7 +16,7 @@ namespace FlatRedBall2.Tiled;
 /// objects anchor at their top-left in Tiled, tile-insert objects anchor at their bottom-left —
 /// both are normalized to a top-left world corner here.
 /// </param>
-/// <param name="Width">Width in world units. Zero for object types with no size (e.g. point objects).</param>
+/// <param name="Width">Width in world units. Zero for object types with no size (e.g. point or polygon objects).</param>
 /// <param name="Height">Height in world units. Zero for object types with no size.</param>
 /// <param name="Class">The object's Tiled "Class" value, or an empty string if unset.</param>
 /// <param name="GlobalId">
@@ -28,6 +29,12 @@ namespace FlatRedBall2.Tiled;
 /// properties, instance values winning on collision — the same merge
 /// <see cref="TileMap.CreateEntities{T}"/> performs. Empty if the object has no properties.
 /// </param>
+/// <param name="Points">
+/// The polygon's vertices in world space, non-null only for polygon objects (null for every
+/// other object type — <see cref="Width"/>/<see cref="Height"/> are 0 for these, not a bounding
+/// box). Like the rest of this entry, rotation is ignored — points reflect the object's
+/// unrotated local shape translated to <see cref="X"/>/<see cref="Y"/>'s coordinate space.
+/// </param>
 public readonly record struct ObjectLayerEntry(
     float X,
     float Y,
@@ -35,4 +42,5 @@ public readonly record struct ObjectLayerEntry(
     float Height,
     string Class,
     int GlobalId,
-    IReadOnlyDictionary<string, string> Properties);
+    IReadOnlyDictionary<string, string> Properties,
+    IReadOnlyList<Vector2>? Points = null);

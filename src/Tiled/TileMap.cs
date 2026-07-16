@@ -328,11 +328,11 @@ public class TileMap
     /// (spawns entities) or <see cref="GenerateCollisionFromClass"/> (builds collision).
     /// </summary>
     /// <remarks>
-    /// Only rectangle objects, tile-insert objects, and other simple (unsized) object types are
-    /// included. Polygon objects are skipped — their shape can't be represented as a single
-    /// axis-aligned rect; use <see cref="GenerateCollisionFromClass"/> or
-    /// <see cref="GenerateCollisionFromProperty"/> for polygon collision. Object rotation is
-    /// ignored — <see cref="ObjectLayerEntry"/> always describes the object's unrotated placement.
+    /// Rectangle objects, tile-insert objects, polygon objects (as <see cref="ObjectLayerEntry.Points"/>),
+    /// and other simple (unsized) object types are all included. Object rotation is ignored —
+    /// <see cref="ObjectLayerEntry"/> always describes the object's unrotated placement; use
+    /// <see cref="GenerateCollisionFromClass"/> or <see cref="GenerateCollisionFromProperty"/>
+    /// instead if you need rotation-aware collision shapes.
     /// </remarks>
     /// <param name="layerName">The object layer's name (case-insensitive).</param>
     /// <returns>
@@ -355,8 +355,9 @@ public class TileMap
             {
                 switch (obj)
                 {
-                    case TilemapPolygonObject:
-                        continue;
+                    case TilemapPolygonObject polyObj:
+                        entries.Add(BuildPolygonObjectEntry(polyObj));
+                        break;
                     case TilemapTileObject tileObj:
                         entries.Add(BuildTileObjectEntry(tileObj));
                         break;
@@ -399,6 +400,28 @@ public class TileMap
         return new ObjectLayerEntry(
             worldX, worldY, rectObj.Size.X, rectObj.Size.Y,
             rectObj.Class ?? string.Empty, GlobalId: 0, StringifyProperties(merged));
+    }
+
+    private ObjectLayerEntry BuildPolygonObjectEntry(TilemapPolygonObject polyObj)
+    {
+        var merged = BuildMergedPropertySnapshot(classProps: null, polyObj.Properties);
+
+        Vector2[]? worldPoints = null;
+        if (polyObj.Points != null)
+        {
+            worldPoints = new Vector2[polyObj.Points.Length];
+            for (int i = 0; i < polyObj.Points.Length; i++)
+            {
+                var p = polyObj.Points[i];
+                worldPoints[i] = new Vector2(
+                    _x + polyObj.Position.X + p.X,
+                    _y - (polyObj.Position.Y + p.Y));
+            }
+        }
+
+        return new ObjectLayerEntry(
+            _x + polyObj.Position.X, _y - polyObj.Position.Y, 0f, 0f,
+            polyObj.Class ?? string.Empty, GlobalId: 0, StringifyProperties(merged), worldPoints);
     }
 
     private ObjectLayerEntry BuildPlainObjectEntry(TilemapObject obj)
