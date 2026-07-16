@@ -155,7 +155,7 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 
 ### Reading object-layer data directly (no entity, no collision)
 
-`TileMap.GetObjectLayerData(layerName)` returns each object's world-space rect, Class, tile GlobalId, and merged properties as an `ObjectLayerEntry` — for object layers used purely as data markers (a Water zone's bounds, Coast tile terrain/side properties) rather than `CreateEntities` spawns or collision generation. Polygon objects are skipped (rect-only); use `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` for polygon shapes.
+`TileMap.GetObjectLayerData(layerName)` returns each object's world-space rect (or, for polygons, `ObjectLayerEntry.Points`), Class, tile GlobalId, and merged properties — for object layers used purely as data markers (a Water zone's bounds, Coast tile terrain/side properties) rather than `CreateEntities` spawns or collision generation. Rotation is ignored for every shape here; use `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` if you need rotation-aware collision instead.
 
 ### Add an object layer for entity spawns
 
