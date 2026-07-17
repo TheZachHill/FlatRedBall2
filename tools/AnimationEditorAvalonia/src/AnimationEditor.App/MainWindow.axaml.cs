@@ -2119,7 +2119,7 @@ public partial class MainWindow : Window
             ? $"Update available: v{updateCheck.LatestVersion}"
             : "Check here for updates:";
         var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
-        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Download Update" : "View Releases on GitHub";
+        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
 
         return new StackPanel
         {

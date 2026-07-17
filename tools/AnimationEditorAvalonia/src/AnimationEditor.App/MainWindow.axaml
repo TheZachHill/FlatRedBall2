@@ -281,7 +281,7 @@
                                 Spacing="8"
                                 VerticalAlignment="Center">
                         <Button x:Name="DownloadUpdateBtn"
-                                Content="Download Update"
+                                Content="Get Update"
                                 Padding="10,3"
                                 FontSize="12" />
                         <Button x:Name="DismissUpdateBannerBtn"
