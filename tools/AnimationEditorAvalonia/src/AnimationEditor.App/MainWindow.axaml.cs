@@ -12,6 +12,7 @@ using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.Update;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
     private readonly IPendingCutState _pendingCutState;
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly IFileAssociationService _fileAssociation;
+    private readonly IUpdateChecker _updateChecker;
     private readonly PngFolderWatcher _pngFolderWatcher = new();
 
     private AppSettingsModel _appSettings = new();
@@ -175,6 +177,7 @@ public partial class MainWindow : Window
         IPendingCutState pendingCutState,
         Services.ThumbnailService thumbnailService,
         IFileAssociationService fileAssociation,
+        IUpdateChecker updateChecker,
         string applicationDataRoot)
     {
         _applicationDataRoot = applicationDataRoot;
@@ -190,6 +193,7 @@ public partial class MainWindow : Window
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
         _fileAssociation = fileAssociation;
+        _updateChecker = updateChecker;
         // Desktop renders the tree with its own _treeRoots collection, so the controller
         // reads expand state from there (browser reads its AnimationTreeControl instead).
         _tabController = new TabController(_undoManager, _appCommands,
@@ -222,6 +226,7 @@ public partial class MainWindow : Window
         WireKeyboard();
         WireTabBar();
         WireDefaultHandlerBanner();
+        WireUpdateAvailableBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
@@ -781,6 +786,7 @@ public partial class MainWindow : Window
 
         RefreshFilesPanel();
         ShowDefaultHandlerBannerIfAppropriate();
+        _ = RunStartupUpdateCheckAsync();
     }
 
     // ── Default-handler prompt banner ─────────────────────────────────────────
@@ -813,6 +819,33 @@ public partial class MainWindow : Window
         {
             DefaultHandlerBanner.IsVisible = true;
         }
+    }
+
+    // ── Update-available banner (issue #681) ──────────────────────────────────
+
+    // Session-only (not persisted): dismissing just quiets the current run. The check
+    // re-runs (and can re-show the banner) on the next launch until the user actually updates.
+    private bool _updateBannerDismissed;
+
+    private void WireUpdateAvailableBanner()
+    {
+        DownloadUpdateBtn.Click += (_, _) => OpenUrl((string)DownloadUpdateBtn.Tag!);
+
+        DismissUpdateBannerBtn.Click += (_, _) =>
+        {
+            _updateBannerDismissed = true;
+            UpdateAvailableBanner.IsVisible = false;
+        };
+    }
+
+    private void ShowUpdateAvailableBannerIfAppropriate(UpdateCheckResult result)
+    {
+        if (!result.IsUpdateAvailable || _updateBannerDismissed)
+            return;
+
+        UpdateAvailableBannerText.Text = $"Animation Editor v{result.LatestVersion} is available — you're on v{typeof(MainWindow).Assembly.GetName().Version}.";
+        DownloadUpdateBtn.Tag = result.ReleaseUrl ?? ReleasesUrl;
+        UpdateAvailableBanner.IsVisible = true;
     }
 
     // ── AppCommands wiring ────────────────────────────────────────────────────
@@ -1866,7 +1899,7 @@ public partial class MainWindow : Window
         ResizeTexture:   () => _ = DoResizeTextureAsync(),
         ShowHistory:     () => SelectHistoryTab(),
         ViewLog:         () => OnViewLogClick(null, null!),
-        About:           () => _ = BuildAboutWindow().ShowDialog(this));
+        About:           () => _ = ShowAboutDialogAsync());
 
     private void RefreshRecentFiles()
     {
@@ -1944,7 +1977,54 @@ public partial class MainWindow : Window
     internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
-        => _ = BuildAboutWindow().ShowDialog(this);
+        => _ = ShowAboutDialogAsync();
+
+    /// <summary>
+    /// Opening the About dialog is the manual "check for updates" action — it always forces a
+    /// fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s cache) rather than adding a
+    /// separate button, since opening this dialog is already an infrequent, explicit user action.
+    /// </summary>
+    private async Task ShowAboutDialogAsync()
+    {
+        var result = await GetUpdateCheckResultAsync(forceRefresh: true);
+        await BuildAboutWindow(result).ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Silent startup check (issue #681) — respects <see cref="UpdateCheckPolicy"/>'s cache
+    /// window so re-launching the same day doesn't re-hit the GitHub API. Shows the persistent
+    /// <see cref="UpdateAvailableBanner"/> only when an update is actually available; never
+    /// blocks or errors visibly on failure.
+    /// </summary>
+    private async Task RunStartupUpdateCheckAsync()
+    {
+        var result = await GetUpdateCheckResultAsync(forceRefresh: false);
+        ShowUpdateAvailableBannerIfAppropriate(result);
+    }
+
+    /// <summary>
+    /// Runs the update check (or reuses the cached result if <see cref="UpdateCheckPolicy"/>
+    /// says it's still fresh and <paramref name="forceRefresh"/> is false), persisting the
+    /// outcome to <see cref="AppSettingsModel"/> so it survives restarts.
+    /// </summary>
+    private async Task<UpdateCheckResult> GetUpdateCheckResultAsync(bool forceRefresh)
+    {
+        var currentVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);
+        var now = DateTime.UtcNow;
+
+        if (!forceRefresh && !UpdateCheckPolicy.ShouldCheck(_appSettings.LastUpdateCheckUtc, now))
+        {
+            return UpdateCheckResult.FromCached(
+                _appSettings.LatestKnownUpdateVersion, _appSettings.LatestKnownUpdateUrl, currentVersion);
+        }
+
+        var result = await _updateChecker.CheckAsync(currentVersion);
+        _appSettings.LastUpdateCheckUtc = now;
+        _appSettings.LatestKnownUpdateVersion = result.LatestVersion?.ToString();
+        _appSettings.LatestKnownUpdateUrl = result.ReleaseUrl;
+        SaveSettingsFile();
+        return result;
+    }
 
     private void OnSettingsClick(object? sender, RoutedEventArgs e)
     {
@@ -2011,10 +2091,11 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Returns a fully-configured About window centered on its owner.
+    /// Returns a fully-configured About window centered on its owner. <paramref name="updateCheck"/>
+    /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow() =>
+    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2022,17 +2103,23 @@ public partial class MainWindow : Window
             Height = 240,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Content = BuildAboutContent(),
+            Content = BuildAboutContent(updateCheck),
         };
 
     /// <summary>
     /// Builds the content panel for the About dialog.
     /// Extracted for testability.
     /// </summary>
-    internal static Control BuildAboutContent()
+    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+
+        var updatePromptText = updateCheck?.IsUpdateAvailable == true
+            ? $"Update available: v{updateCheck.LatestVersion}"
+            : "Check here for updates:";
+        var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
+        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
 
         return new StackPanel
         {
@@ -2043,10 +2130,23 @@ public partial class MainWindow : Window
                 new TextBlock { Text = "AnimationEditor", FontSize = 16 },
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
-                new TextBlock { Text = "Check here for updates:", Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildOpenUrlButton(ReleasesUrl, "View Releases on GitHub"),
+                new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
+                BuildOpenUrlButton(releaseUrl, buttonLabel),
             }
         };
+    }
+
+    /// <summary>
+    /// Opens a URL in the user's default browser. Network/shell failures are swallowed —
+    /// there's no useful recovery action for the user beyond trying the link themselves.
+    /// </summary>
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch { }
     }
 
     /// <summary>
@@ -2056,14 +2156,7 @@ public partial class MainWindow : Window
     private static Button BuildOpenUrlButton(string url, string label)
     {
         var button = new Button { Content = label, Tag = url };
-        button.Click += (_, _) =>
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch { }
-        };
+        button.Click += (_, _) => OpenUrl(url);
         return button;
     }
 
