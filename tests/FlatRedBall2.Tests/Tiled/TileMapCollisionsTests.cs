@@ -730,4 +730,30 @@ public class TileMapCollisionsTests
         rect.SolidSides.ShouldBe(
             SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
+
+    [Fact]
+    public void GenerateFromClass_ObjectLayerRotatedRectAndPolygonSameCellSameClass_BothEmitted()
+    {
+        // Issue #741 repro: a rectangle object rotated to a non-90-degree angle (so it converts
+        // to a polygon per AddRectangleObject) and a genuine polygon object, both matching class
+        // "Solid" on the same object layer, with bounding boxes landing in the SAME single cell
+        // (0,0). AddPolygonFromWorldPoints routes both through AddPolygonTileAtCell(0,0,...) —
+        // the second call throws InvalidOperationException ("A polygon tile already exists at
+        // cell...") because multi-polygon-per-cell is not supported, even though the two source
+        // objects are unrelated shapes that merely happen to share a cell.
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(8, 4), size: new XnaVec2(6, 6))
+        { Class = "Solid", Rotation = MathF.PI / 4f });
+
+        var tri = new XnaVec2[] { new(12, 12), new(15, 12), new(12, 15) };
+        layer.AddObject(new TilemapPolygonObject(
+            id: 2, position: new XnaVec2(0, 0), points: tri) { Class = "Solid" });
+
+        var tilemap = BuildObjectOnlyTilemap(1, 1, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        coll.AllTiles.OfType<Polygon>().Count().ShouldBe(2);
+    }
 }
