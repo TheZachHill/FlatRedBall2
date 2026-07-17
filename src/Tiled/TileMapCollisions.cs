@@ -473,8 +473,18 @@ public static class TileMapCollisions
         var centroid = new Vector2(sumX / worldPoints.Length, sumY / worldPoints.Length);
 
         var (col, row) = collection.GetCellAt(centroid);
-        var cellCenter = collection.GetCellWorldPosition(col, row);
 
+        // AddPolygonTileAtCell supports only one polygon per cell. Object-layer authoring has no
+        // such restriction — a rotated rect (converted to a polygon above) and a separate polygon
+        // object can legitimately centroid into the same cell. Fall back to the same
+        // AddSpanningPolygon mechanism used for multi-cell shapes rather than throwing.
+        if (collection.GetPolygonTileAtCell(col, row) != null)
+        {
+            collection.AddSpanningPolygon(worldPoints);
+            return;
+        }
+
+        var cellCenter = collection.GetCellWorldPosition(col, row);
         var localPoints = new List<Vector2>(worldPoints.Length);
         foreach (var p in worldPoints)
             localPoints.Add(p - cellCenter);
