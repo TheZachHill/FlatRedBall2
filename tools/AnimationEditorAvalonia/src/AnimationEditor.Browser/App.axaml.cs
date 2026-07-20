@@ -1126,7 +1126,7 @@ public partial class App : Application
         // changed" event to subscribe to instead. See docs/BROWSER_FILES_PANEL_DECISION.md.
         var filesTab = new TabItem
         {
-            Header = "Files",
+            Header = "Textures",
             FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
             VerticalContentAlignment = VerticalAlignment.Center,

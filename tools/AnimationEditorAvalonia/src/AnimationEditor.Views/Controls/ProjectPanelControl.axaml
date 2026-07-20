@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:AnimationEditor.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.Views.Controls.ProjectPanelControl"
              x:DataType="controls:ProjectPanelControl">
     <!--
@@ -23,6 +24,7 @@
 
         <TreeView x:Name="ProjectTree" x:FieldModifier="Public"
                   Grid.Row="1"
+                  Classes="folder-tree"
                   ItemsSource="{Binding TreeRoots}"
                   Background="Transparent"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -37,9 +39,19 @@
             <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="controls:AchxTreeNodeVm"
                                   ItemsSource="{Binding Children}">
-                    <TextBlock Text="{Binding Name}"
-                               FontSize="11"
-                               TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                        <controls:FolderExpanderIcon IsVisible="{Binding IsFolder}"
+                                                      IsOpen="{Binding IsFolderOpen}"
+                                                      Toggled="OnFolderExpanderToggled" />
+                        <svg:Svg IsVisible="{Binding IsFile}"
+                                 Width="16" Height="16"
+                                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
+                                 CurrentColor="{DynamicResource IconInkMuted}" />
+                        <TextBlock Text="{Binding Name}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>
         </TreeView>

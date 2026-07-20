@@ -1062,8 +1062,8 @@
                         </Border>
                     </TabItem>
 
-                    <!-- Files -->
-                    <TabItem x:Name="FilesTab" Header="Files">
+                    <!-- Textures: PNGs only (x:Name stays FilesTab, referenced by code-behind/tests). -->
+                    <TabItem x:Name="FilesTab" Header="Textures">
                         <controls:FilesPanelControl x:Name="FilesPanel" />
                     </TabItem>
 

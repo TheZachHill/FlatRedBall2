@@ -1,5 +1,6 @@
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -70,6 +71,15 @@ public partial class ProjectPanelControl : UserControl
         if (ProjectTree.SelectedItem is AchxTreeNodeVm { IsFile: true, Entry: { } entry })
             FileSelected?.Invoke(entry);
     }
+
+    private void OnFolderExpanderToggled(object? sender, EventArgs e)
+    {
+        if (sender is not Control control) return;
+        var item = control.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        if (item?.DataContext is not AchxTreeNodeVm { IsFolder: true } node) return;
+
+        node.IsExpanded = !node.IsExpanded;
+    }
 }
 
 /// <summary>Tree node view-model for <see cref="ProjectPanelControl"/>'s <c>TreeView</c>.</summary>
@@ -83,6 +93,8 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
     public bool IsFile => Entry is not null;
     public ObservableCollection<AchxTreeNodeVm> Children { get; } = new();
 
+    public bool IsFolderOpen => _isExpanded;
+
     public bool IsExpanded
     {
         get => _isExpanded;
@@ -91,6 +103,7 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
             if (_isExpanded == value) return;
             _isExpanded = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(IsFolderOpen));
         }
     }
 
