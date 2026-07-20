@@ -822,7 +822,7 @@ public partial class MainWindow : Window
         if (!_ioManager.RecoveryFileExists()) return false;
 
         bool restore = await _appCommands.ConfirmAsync(
-            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or discard them permanently?",
+            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab? (No discards them permanently.)",
             "Restore Recovery File");
 
         if (!restore)
