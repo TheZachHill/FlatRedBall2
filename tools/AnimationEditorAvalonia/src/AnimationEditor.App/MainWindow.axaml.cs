@@ -821,9 +821,9 @@ public partial class MainWindow : Window
     {
         if (!_ioManager.RecoveryFileExists()) return false;
 
-        bool restore = await _appCommands.ConfirmAsync(
-            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab? (No discards them permanently.)",
-            "Restore Recovery File");
+        bool restore = await ShowTwoButtonDialogAsync(
+            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or delete them permanently?",
+            "Restore Recovery File", "Restore", "Delete");
 
         if (!restore)
         {
@@ -914,6 +914,7 @@ public partial class MainWindow : Window
         _appCommands.DoOnUiThread = action => Dispatcher.UIThread.InvokeAsync(action);
         _appCommands.ConfirmAsync = ShowConfirmDialogAsync;
         _appCommands.PromptStringAsync = ShowStringInputDialogAsync;
+        ShowTwoButtonDialogAsync = ShowTwoButtonDialogAsyncCore;
 
         // File dialog service
         _appCommands.FileDialogService = new Services.AvaloniaFileDialogService(this);
@@ -5133,11 +5134,34 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds the yes/no confirmation dialog. ENTER confirms (Yes), ESC cancels
-    /// (No), and closing the window by any other means resolves
-    /// <paramref name="tcs"/> to false. Extracted for testability.
+    /// Test seam for <see cref="ShowTwoButtonDialogAsyncCore"/> -- assigned to the real dialog in
+    /// <see cref="WireAppCommands"/>, mirroring <c>IAppCommands.ConfirmAsync</c>'s pattern. Not a
+    /// property on <c>IAppCommands</c> itself: that delegate is shared by ~20 test stubs across
+    /// unrelated tests, and this is UI-layer-only (used by exactly one caller,
+    /// <see cref="TryRestoreRecoveryFileAsync"/>) so it doesn't need that shared indirection.
     /// </summary>
-    internal static Window BuildConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
+    internal Func<string, string, string, string, Task<bool>> ShowTwoButtonDialogAsync { get; set; } = null!;
+
+    /// <summary>
+    /// Same as <see cref="ShowConfirmDialogAsync"/> but with caller-chosen button text instead of
+    /// generic Yes/No, for prompts where "Yes"/"No" would force the user to mentally map a named
+    /// choice (e.g. Restore/Delete) back onto Yes/No.
+    /// </summary>
+    private async Task<bool> ShowTwoButtonDialogAsyncCore(string message, string title, string confirmLabel, string cancelLabel)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        var dialog = BuildConfirmDialog(message, title, tcs, confirmLabel, cancelLabel);
+        await dialog.ShowDialog(this);
+        return await tcs.Task;
+    }
+
+    /// <summary>
+    /// Builds the confirmation dialog. ENTER confirms (<paramref name="confirmLabel"/>), ESC
+    /// cancels (<paramref name="cancelLabel"/>), and closing the window by any other means
+    /// resolves <paramref name="tcs"/> to false. Extracted for testability.
+    /// </summary>
+    internal static Window BuildConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs,
+        string confirmLabel = "Yes", string cancelLabel = "No")
     {
         var dialog = new Window
         {
@@ -5161,8 +5185,8 @@ public partial class MainWindow : Window
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
         };
 
-        var yesBtn = new Button { Content = "Yes" };
-        var noBtn  = new Button { Content = "No" };
+        var yesBtn = new Button { Content = confirmLabel };
+        var noBtn  = new Button { Content = cancelLabel };
         yesBtn.Click += (_, _) => { tcs.TrySetResult(true);  dialog.Close(); };
         noBtn.Click  += (_, _) => { tcs.TrySetResult(false); dialog.Close(); };
         buttons.Children.Add(yesBtn);
