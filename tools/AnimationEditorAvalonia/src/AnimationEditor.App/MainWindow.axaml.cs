@@ -817,7 +817,7 @@ public partial class MainWindow : Window
         if (!_ioManager.RecoveryFileExists()) return false;
 
         bool restore = await _appCommands.ConfirmAsync(
-            "A recovery file was found from an unexpected shutdown. Restore the unsaved animation?",
+            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or discard them permanently?",
             "Restore Recovery File");
 
         if (!restore)
