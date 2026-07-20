@@ -19,6 +19,12 @@ namespace AnimationEditor.Views.Controls;
 public partial class ProjectPanelControl : UserControl
 {
     private IReadOnlyList<AchxFileEntry> _allEntries = Array.Empty<AchxFileEntry>();
+    private string _searchQuery = string.Empty;
+
+    // Guards against re-entrant SelectionChanged while ClearSearchAndReveal restores the
+    // selection post-rebuild -- without it, that restore would re-fire FileSelected for the
+    // same entry a second time.
+    private bool _isRestoringSelectionAfterSearchClear;
 
     public ObservableCollection<AchxTreeNodeVm> TreeRoots { get; } = new();
 
@@ -55,21 +61,69 @@ public partial class ProjectPanelControl : UserControl
         var files = excludeBinObj
             ? _allEntries.Where(f => !BinObjPathFilter.IsExcluded(f.RelativePath)).ToList()
             : _allEntries.ToList();
+        files = AchxSearchFilter.Filter(files, _searchQuery).ToList();
 
         EmptyMessage.IsVisible = files.Count == 0;
         ProjectTree.IsVisible = files.Count > 0;
         EmptyMessage.Text = _allEntries.Count == 0
             ? "File → Open Project Folder… to browse its .achx files."
-            : "No .achx files match the current filter.";
+            : string.IsNullOrWhiteSpace(_searchQuery)
+                ? "No .achx files match the current filter."
+                : "No .achx files match your search.";
 
         foreach (var node in AchxFolderTreeBuilder.Build(files))
             TreeRoots.Add(AchxTreeNodeVm.FromNode(node));
     }
 
+    private void OnSearchQueryChanged(object? sender, string query)
+    {
+        _searchQuery = query;
+        Rebuild();
+    }
+
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (ProjectTree.SelectedItem is AchxTreeNodeVm { IsFile: true, Entry: { } entry })
-            FileSelected?.Invoke(entry);
+        if (_isRestoringSelectionAfterSearchClear) return;
+        if (ProjectTree.SelectedItem is not AchxTreeNodeVm { IsFile: true, Entry: { } entry }) return;
+
+        FileSelected?.Invoke(entry);
+
+        // The pick came from a filtered result -- clear the search so the tree returns to its
+        // full contents, then re-select/reveal the same entry in it rather than leaving the
+        // user looking at an empty selection in a suddenly-repopulated tree.
+        if (!string.IsNullOrEmpty(_searchQuery))
+            ClearSearchAndReveal(entry);
+    }
+
+    private void ClearSearchAndReveal(AchxFileEntry entry)
+    {
+        ProjectSearchBox.Clear(); // synchronously fires QueryChanged("") -> Rebuild()
+
+        var match = FindNode(TreeRoots, entry);
+        if (match is null) return;
+
+        _isRestoringSelectionAfterSearchClear = true;
+        try
+        {
+            ProjectTree.SelectedItem = match;
+            ProjectTree.ScrollIntoView(match);
+        }
+        finally
+        {
+            _isRestoringSelectionAfterSearchClear = false;
+        }
+    }
+
+    private static AchxTreeNodeVm? FindNode(IEnumerable<AchxTreeNodeVm> nodes, AchxFileEntry entry)
+    {
+        foreach (var node in nodes)
+        {
+            if (ReferenceEquals(node.Entry, entry)) return node;
+
+            var found = FindNode(node.Children, entry);
+            if (found is not null) return found;
+        }
+        return null;
     }
 
     private void OnFolderExpanderToggled(object? sender, EventArgs e)

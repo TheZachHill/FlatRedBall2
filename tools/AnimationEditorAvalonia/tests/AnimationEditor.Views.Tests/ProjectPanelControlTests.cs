@@ -70,6 +70,44 @@ public class ProjectPanelControlTests
         Assert.Equal(2, control.TreeRoots.Count);
     }
 
+    [AvaloniaFact]
+    public void TypingInSearch_FiltersTreeToMatches()
+    {
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        var entries = new[]
+        {
+            new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx"),
+            new AchxFileEntry(new FakeFile("enemy.achx"), root, "enemy.achx"),
+        };
+        control.SetEntries(entries);
+
+        control.ProjectSearchBox.SearchBox.Text = "hero";
+
+        Assert.Single(control.TreeRoots);
+        Assert.Equal("hero.achx", control.TreeRoots[0].Name);
+    }
+
+    [AvaloniaFact]
+    public void SelectingFilteredResult_ClearsSearchAndRevealsFullTreeWithSelection()
+    {
+        var control = new AnimationEditor.Views.Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        var hero = new AchxFileEntry(new FakeFile("hero.achx"), root, "hero.achx");
+        var enemy = new AchxFileEntry(new FakeFile("enemy.achx"), root, "enemy.achx");
+        control.SetEntries(new[] { hero, enemy });
+        control.ProjectSearchBox.SearchBox.Text = "hero";
+
+        var selections = new List<AchxFileEntry>();
+        control.FileSelected += e => selections.Add(e);
+        control.ProjectTree.SelectedItem = control.TreeRoots[0];
+
+        Assert.Equal([hero], selections); // fired exactly once, not re-fired by the reveal step
+        Assert.False(control.ProjectSearchBox.SearchBox.IsVisible); // search collapsed
+        Assert.Equal(2, control.TreeRoots.Count); // full tree restored
+        Assert.Same(hero, ((AnimationEditor.Views.Controls.AchxTreeNodeVm)control.ProjectTree.SelectedItem!).Entry);
+    }
+
     private sealed class FakeFile : IEditorFile
     {
         public FakeFile(string name) => Name = name;
