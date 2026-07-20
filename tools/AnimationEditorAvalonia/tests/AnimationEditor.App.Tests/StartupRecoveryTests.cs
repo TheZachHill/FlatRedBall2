@@ -59,6 +59,28 @@ public class StartupRecoveryTests
     }
 
     [AvaloniaFact]
+    public void RecoveryFilePresent_UserConfirms_DeletesRecoveryFileAfterRestore()
+    {
+        // Otherwise the same recovery file re-prompts on every subsequent launch, whether or
+        // not the user goes on to Save As the restored content.
+        var ctx = TestHelpers.BuildServices();
+        var seed = new AnimationChainListSave();
+        seed.AnimationChains.Add(new AnimationChainSave { Name = "Recovered" });
+        ctx.IoManager.WriteRecoveryFile(seed);
+
+        var window = ctx.CreateMainWindow();
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            Assert.False(ctx.IoManager.RecoveryFileExists());
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void RecoveryFilePresent_UserDeclines_DeletesFileAndStartsNormally()
     {
         var ctx = TestHelpers.BuildServices();

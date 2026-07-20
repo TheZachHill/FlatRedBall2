@@ -833,6 +833,7 @@ public partial class MainWindow : Window
             return false;
         }
 
+        _ioManager.DeleteRecoveryFile();
         _projectManager.AnimationChainListSave = recovered;
         _projectManager.FileName = null;
         _selectedState.Reset();
