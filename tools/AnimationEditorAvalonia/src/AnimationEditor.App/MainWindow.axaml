@@ -90,8 +90,8 @@
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New"          x:Name="MenuNew" />
                         <MenuItem Header="_Load..."       x:Name="MenuLoad" />
-                        <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
                         <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
+                        <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
                         <MenuItem Header="_Save"          x:Name="MenuSave" />
                         <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
